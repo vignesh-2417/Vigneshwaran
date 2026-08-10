@@ -1,29 +1,40 @@
-# Govardhan Leela — Lord Krishna Lifting Govardhan Hill
+# Govardhan Leela — Cinematic Mini Clip
 
-A cinematic, AI-generated keyframe video depicting the sacred story of young Lord Krishna protecting the people and animals of Vrindavan by lifting Govardhan Hill.
+Animated cinematic telling of young Lord Krishna lifting Govardhan Hill to protect Vrindavan.
 
-## Video
+## Videos
 
-- **Full quality (1080p):** [`krishna_govardhan_leela.mp4`](./krishna_govardhan_leela.mp4)
-- Duration: ~41 seconds
-- Resolution: 1920×1080
-- Style: Epic Indian mythological cinema montage with Ken Burns motion, crossfades, and ambient soundtrack
+| File | Description |
+|------|-------------|
+| [`krishna_govardhan_movie.mp4`](./krishna_govardhan_movie.mp4) | **Animated mini-movie** (~39s, 1080p) with motion FX |
+| [`krishna_govardhan_leela.mp4`](./krishna_govardhan_leela.mp4) | Earlier keyframe slideshow version |
 
-## Story Sequence
+## What’s animated in the mini-movie
 
-1. **Vrindavan** — Krishna in the peaceful village among cows and villagers
-2. **Indra’s Anger** — Dark storm, lightning, floods over Vrindavan
-3. **Divine Act** — Krishna lifts Govardhan Hill with the little finger of his left hand
-4. **Close-up** — Krishna’s calm, compassionate divine expression
-5. **Shelter** — Villagers, children, and cows safe beneath the mountain
-6. **Seven Days** — Krishna holds the hill through day and night
-7. **Indra’s Realization** — Pride gives way to humility as the storm clears
-8. **Divine Ending** — Peace returns; Krishna stands by Govardhan Hill in golden light
+- Progressive action keyframes (walk → teach → storm → lift → shelter → finale)
+- Optical-flow morphing between related poses (mountain rising sequence)
+- Animated heavy rain overlay during the storm
+- Lightning flashes and storm audio bed
+- Dynamic camera zoom / pan / shake
+- Scrolling cloud / fog atmosphere layers
+- Cinematic letterbox, film grain, vignette
+- Soft ambient drone soundtrack
 
-## Keyframes
+## Story beats
 
-Individual scene stills are included in this folder for reference and reuse.
+1. Krishna in Vrindavan  
+2. Indra’s storm begins  
+3. Krishna lifts Govardhan Hill  
+4. Divine close-up  
+5. Shelter under the mountain  
+6. Seven days and nights  
+7. Indra’s humility  
+8. Peaceful golden ending  
 
-## Note
+## Honest limitation
 
-This is a sacred-story cinematic montage composed from AI-generated keyframes with Ken Burns motion and crossfades (not a continuous generative video model like Sora/Runway). Krishna’s appearance is kept consistent across scenes in the traditional form: blue skin, peacock feather, yellow dhoti, and golden ornaments. The composition follows the Govardhan Leela narrative of protection under the hill for seven days.
+This environment does **not** include a full generative video model (Sora / Runway / Kling / SVD).  
+The mini-movie is built from AI stills + motion synthesis (morphs, camera, weather FX).  
+Characters do not have fully independent body/facial animation like a real filmed or AI-video shot.
+
+For true continuous character motion, export these keyframes into Runway Gen-3, Kling, Luma Dream Machine, or Pika as image-to-video prompts.
