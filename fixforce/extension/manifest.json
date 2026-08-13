@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "FixForce – Salesforce Error Analyzer",
+  "version": "1.1.0",
+  "description": "Detect Salesforce errors in real-time, analyze them with AI, and get instant root cause + fix steps.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FixForce",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.salesforce.com/*", "*://*.force.com/*", "*://*.lightning.force.com/*"],
+      "js": ["errorIntelligence.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.salesforce.com/*",
+    "*://*.force.com/*",
+    "*://*.lightning.force.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["*://*.salesforce.com/*", "*://*.force.com/*"]
+    }
+  ]
+}
