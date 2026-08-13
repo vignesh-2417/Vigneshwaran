@@ -530,10 +530,22 @@ def build():
         "If the quote margin is less than 10%, clicking Submit for Approval routes "
         "the quote to a VP user for approval.",
     )
+    add_callout(
+        doc,
+        "STATUS RULE",
+        "Approval Status should be updated to Needs Approval when the approval "
+        "condition is met (for example, margin below the approved threshold).",
+        bg=WARN_BG,
+    )
 
     add_heading_styled(doc, "8.2 Behavior after submit", level=2)
-    add_bullet(doc, "Quote status / approval status moves to **In Review**.")
+    add_bullet(doc, "Once submitted for approval, the quote status changes to **In Review**.")
     add_bullet(doc, "Approvers receive an email notification.")
+    add_bullet(
+        doc,
+        "After submit, the Quote **Related** list / **Approval History** provides "
+        "options to **Approve**, **Reject**, or **Recall**.",
+    )
 
     add_heading_styled(doc, "8.3 Quote creation restriction", level=2)
     add_body(
@@ -544,13 +556,13 @@ def build():
     add_bullet(doc, "**Rejected**")
     add_bullet(doc, "**In Review**")
 
-    add_heading_styled(doc, "8.4 Steps", level=2)
+    add_heading_styled(doc, "8.4 Submit for approval", level=2)
     add_numbered(doc, "On the Quote, review **Margin** and **Approval Status**.")
     add_numbered(doc, "Click **Submit for Approval**.")
     add_numbered(
         doc,
         "On the Quote **Related** lists, open **Approval History** to track status "
-        "(Submitted, Approved, Recalled, and so on).",
+        "(Submitted, Approved, Rejected, Recalled, and so on).",
     )
 
     add_figure(
@@ -574,6 +586,78 @@ def build():
         bg=WARN_BG,
     )
 
+    add_heading_styled(doc, "8.5 Approve, Reject, or Recall", level=2)
+    add_body(
+        doc,
+        "After a Quote is submitted for approval, use Approval History on the Quote "
+        "related list to take action:",
+    )
+    add_bullet(doc, "**Approve** — approve the pending approval request.")
+    add_bullet(doc, "**Reject** — reject the pending approval request.")
+    add_bullet(
+        doc,
+        "**Recall** — open the dropdown next to Reject and select **Recall** to "
+        "withdraw the approval request.",
+    )
+    add_callout(
+        doc,
+        "RECALL STATUS",
+        "If approval is recalled, Approval Status returns to Needs Approval.",
+        bg=IMPORTANT_BG,
+    )
+
+    add_figure(
+        doc,
+        "image12.png",
+        "Figure 10. Approval History — Approve, Reject, and Recall actions on a submitted Quote.",
+        width=6.0,
+    )
+
+    add_heading_styled(doc, "8.6 Approve or Reject from email", level=2)
+    add_body(
+        doc,
+        "Once a Quote is submitted for approval, Salesforce sends an email notification "
+        "to the approver. Approve and Reject options are enabled directly in the email, "
+        "so the approver can take action without opening Salesforce.",
+    )
+    add_numbered(
+        doc,
+        "The approver receives an email when a Quote requires approval "
+        "(for example, when margin is below the approved threshold).",
+    )
+    add_numbered(
+        doc,
+        "From the email, the approver can **Approve** or **Reject** "
+        "(including by reply action where enabled).",
+    )
+    add_numbered(
+        doc,
+        "After the decision, the submitter / team receives the appropriate email "
+        "notification that the Quote was approved or rejected.",
+    )
+
+    add_figure(
+        doc,
+        "image14.png",
+        "Figure 11. Approval request email — Quote requires approval when margin is below threshold.",
+        width=5.2,
+    )
+    add_figure(
+        doc,
+        "image13.png",
+        "Figure 12. Email approval reply — approver can Approve (or Reject) from email.",
+        width=4.8,
+    )
+
+    add_heading_styled(doc, "8.7 Approval status summary", level=2)
+    add_bullet(
+        doc,
+        "When the approval condition is met → Approval Status = **Needs Approval**.",
+    )
+    add_bullet(doc, "After Submit for Approval → status = **In Review**.")
+    add_bullet(doc, "If approval is **Recalled** → status returns to **Needs Approval**.")
+    add_bullet(doc, "If approved or rejected → the related party receives email notification.")
+
     # ----- 9. Create Order -----
     add_heading_styled(doc, "9. Create an Order from a Quote", level=1)
 
@@ -585,7 +669,7 @@ def build():
     add_figure(
         doc,
         "image10.png",
-        "Figure 10. Create Order — select Create Single Order, then continue.",
+        "Figure 13. Create Order — select Create Single Order, then continue.",
         width=5.6,
     )
 
@@ -611,7 +695,7 @@ def build():
     add_figure(
         doc,
         "image11.png",
-        "Figure 11. Order header — Generate Order Doc and Send Order Doc.",
+        "Figure 14. Order header — Generate Order Doc and Send Order Doc.",
         width=6.0,
     )
 
@@ -650,6 +734,18 @@ def build():
         ("Quote fields", "Billing Term, Shipping Term, Warehouse, Address"),
         ("STLE", "Lines tab → Browse Catalog / Add Product"),
         ("Approval", "Margin < 10% → Submit for Approval → VP; status In Review"),
+        (
+            "Approve / Reject / Recall",
+            "From Approval History after submit; Recall returns status to Needs Approval",
+        ),
+        (
+            "Email approval",
+            "Approver can Approve or Reject from email; notifications sent on decision",
+        ),
+        (
+            "Approval statuses",
+            "Needs Approval (condition met / after recall) → In Review (submitted)",
+        ),
         (
             "Quote gate",
             "Do not create when Approval Status is Needs Approval, Rejected, or In Review",
