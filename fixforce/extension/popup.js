@@ -136,13 +136,50 @@ function renderHelpArticle(data) {
 
   const link = document.getElementById("help-article-link");
   link.href = article.url || "https://help.salesforce.com/";
+
+  const secondary = document.getElementById("secondary-help-link");
+  if (secondary && article.secondaryArticle?.url) {
+    secondary.href = article.secondaryArticle.url;
+    secondary.textContent = `Also see: ${article.secondaryArticle.title} ↗`;
+    secondary.classList.remove("hidden");
+  } else if (secondary) {
+    secondary.classList.add("hidden");
+  }
+}
+
+function renderInvestigation(data) {
+  const card = document.getElementById("investigation-card");
+  const inv = data.investigation;
+  if (!card || !inv?.headline) {
+    card?.classList.add("hidden");
+    return;
+  }
+  card.classList.remove("hidden");
+  document.getElementById("investigation-headline").textContent = inv.headline;
+  document.getElementById("investigation-narrative").textContent =
+    inv.narrative || data.rootCause || "";
+
+  const meta = document.getElementById("investigation-meta");
+  meta.innerHTML = "";
+  const items = [];
+  if (inv.flowName) items.push({ icon: "🔄", label: inv.flowName, accent: true });
+  if (inv.flowElement) items.push({ icon: "📍", label: inv.flowElement });
+  if (inv.fieldName) items.push({ icon: "📝", label: inv.fieldName });
+  if (inv.objectName) items.push({ icon: "📦", label: inv.objectName });
+  if (inv.apexClass) items.push({ icon: "⚙️", label: inv.apexClass });
+  items.forEach(({ icon, label, accent }) => {
+    const pill = document.createElement("span");
+    pill.className = "pill" + (accent ? " accent" : "");
+    pill.textContent = `${icon} ${label}`;
+    meta.appendChild(pill);
+  });
 }
 
 function renderFailureType(data) {
   const pill = document.getElementById("failure-type-pill");
   const label = data.failureLabel || data.helpArticle?.categoryLabel;
   if (label) {
-    pill.textContent = label;
+    pill.textContent = label.length > 42 ? label.slice(0, 42) + "…" : label;
     pill.classList.remove("hidden");
   } else {
     pill.classList.add("hidden");
@@ -155,8 +192,15 @@ function renderResult(data) {
   renderCategoryBadge(data.category);
   renderConfidence(data.confidence);
   renderContextPills(data);
+  renderInvestigation(data);
   renderFailureType(data);
   renderHelpArticle(data);
+
+  // Use failure-specific label on badge when composite
+  if (data.failureLabel) {
+    const badge = document.getElementById("category-badge");
+    badge.textContent = "🔎 " + data.failureLabel;
+  }
 
   document.getElementById("error-text-preview").textContent =
     truncate(data.errorText, 180);
@@ -193,13 +237,14 @@ function loadState() {
           if (latestErrorContext?.errorText && window.FixForceIntelligence) {
             const local = FixForceIntelligence.analyzeLocally(
               latestErrorContext.errorText,
-              latestErrorContext.context
+              latestErrorContext.context,
+              latestErrorContext.object
             );
             const card = document.getElementById("api-help-article-card");
             card.classList.remove("hidden");
-            document.getElementById("api-help-title").textContent = local.helpArticle.title;
+            document.getElementById("api-help-title").textContent = local.investigation?.headline || local.helpArticle.title;
             document.getElementById("api-help-summary").textContent =
-              `${local.classification.label}: ${local.helpArticle.summary}`;
+              local.investigation?.narrative || `${local.classification.label}: ${local.helpArticle.summary}`;
             document.getElementById("api-help-link").href = local.helpArticle.url;
           }
         });

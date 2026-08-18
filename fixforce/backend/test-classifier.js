@@ -1,52 +1,65 @@
 /**
- * Quick smoke tests for classifier + help articles (no API key needed).
+ * Smoke tests for classifier + investigator (composite scenarios).
  */
 const { classifyError } = require("./classifier");
-const { getHelpArticle } = require("./helpArticles");
+const { investigateError } = require("./investigator");
 const { buildFallbackResponse } = require("./ai");
 
 const cases = [
   {
-    name: "Validation rule",
-    text: "FIELD_CUSTOM_VALIDATION_EXCEPTION: Amount must be greater than 0",
+    name: "Flow + Permission (user lacks field access)",
+    text: 'The flow "Update_Account_Status" failed. An error occurred at element "Update_Records_1". INSUFFICIENT_ACCESS: insufficient privileges on cross-reference entity. Field "Status__c"',
     context: "record_page",
-    expect: "VALIDATION",
+    expectScenario: "FLOW_PERMISSION",
+    expectLabel: "Flow Failed — Permission Issue",
   },
   {
-    name: "Flow fault",
-    text: "An unhandled fault has occurred in this flow",
+    name: "Flow + Validation",
+    text: 'Flow "Opportunity_Auto_Update" failed. FIELD_CUSTOM_VALIDATION_EXCEPTION: Amount must be positive',
     context: "flow",
-    expect: "FLOW",
+    expectScenario: "FLOW_VALIDATION",
   },
   {
-    name: "Permission",
-    text: "INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY",
+    name: "Plain validation",
+    text: "FIELD_CUSTOM_VALIDATION_EXCEPTION: Stage cannot be blank",
     context: "record_page",
-    expect: "PERMISSION",
+    expectCategory: "VALIDATION",
   },
   {
-    name: "Required field",
-    text: "Required fields are missing: [Name]",
-    context: "new_record",
-    expect: "REQUIRED_FIELD",
+    name: "Integration callout",
+    text: "We couldn't access the credential(s). You might not have the required permissions, or the named credential might not exist.",
+    context: "unknown",
+    expectCategory: "INTEGRATION",
   },
 ];
 
 let passed = 0;
 for (const c of cases) {
-  const result = classifyError(c.text, c.context);
-  const ok = result.category === c.expect;
+  const result = investigateError(c.text, c.context, "Account");
+  const ok =
+    (c.expectScenario && result.investigation.scenarioId === c.expectScenario) ||
+    (c.expectCategory && result.classification.category === c.expectCategory) ||
+    (c.expectLabel && result.classification.label === c.expectLabel);
+
   if (ok) passed++;
-  console.log(`${ok ? "✓" : "✗"} ${c.name}: ${result.category} (${result.label})`);
-  const article = getHelpArticle(result, c.text, c.context);
-  console.log(`  → Help: ${article.title}`);
+  console.log(`${ok ? "✓" : "✗"} ${c.name}`);
+  console.log(`  Scenario: ${result.investigation.scenarioId || "—"}`);
+  console.log(`  Headline: ${result.investigation.headline}`);
+  if (result.investigation.flowName) {
+    console.log(`  Flow: ${result.investigation.flowName}`);
+  }
 }
 
-const fallback = buildFallbackResponse(
-  "FIELD_CUSTOM_VALIDATION_EXCEPTION: Stage cannot be blank",
-  "record_page"
+const flowPerm = buildFallbackResponse(
+  'The flow "Lead_Assignment" failed at element "Update_Lead". INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY. Field "OwnerId"',
+  "record_page",
+  "Lead"
 );
-console.log(`\nFallback category: ${fallback.category}, help: ${fallback.helpArticle.title}`);
+console.log(`\nAPI-style response:`);
+console.log(`  failureLabel: ${flowPerm.failureLabel}`);
+console.log(`  investigation.headline: ${flowPerm.investigation.headline}`);
+console.log(`  helpArticle: ${flowPerm.helpArticle.title}`);
+console.log(`  fixSteps: ${flowPerm.fixSteps.length} steps`);
 
 if (passed !== cases.length) process.exit(1);
-console.log(`\n${passed}/${cases.length} classifier tests passed`);
+console.log(`\n${passed}/${cases.length} investigation tests passed`);

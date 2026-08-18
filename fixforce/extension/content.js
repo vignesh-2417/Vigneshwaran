@@ -183,8 +183,16 @@
   function showHelpBanner(errorText, context) {
     if (!window.FixForceIntelligence) return;
 
-    const { classification, helpArticle } = FixForceIntelligence.analyzeLocally(errorText, context);
+    const { object } = parseUrl(window.location.href);
+    const { classification, helpArticle, investigation } = FixForceIntelligence.analyzeLocally(
+      errorText,
+      context,
+      object
+    );
     removeHelpBanner();
+
+    const title = investigation?.headline || helpArticle.title;
+    const summary = investigation?.narrative || helpArticle.summary;
 
     helpBannerEl = document.createElement("div");
     helpBannerEl.id = "fixforce-help-banner";
@@ -277,8 +285,8 @@
         <button class="ff-close" aria-label="Dismiss">×</button>
       </div>
       <div class="ff-body">
-        <div class="ff-title">${helpArticle.title}</div>
-        <div class="ff-summary">${helpArticle.summary}</div>
+        <div class="ff-title">${title}</div>
+        <div class="ff-summary">${summary}</div>
         <div class="ff-actions">
           <a class="ff-btn" href="${helpArticle.url}" target="_blank" rel="noopener noreferrer">Open Help Article ↗</a>
           <button class="ff-btn" data-action="analyze">Analyze with AI</button>

@@ -1,14 +1,13 @@
 /**
  * FixForce – ai.js
- * Pre-classification (rule-based) + OpenAI analysis for Salesforce errors.
+ * Deep investigation + optional OpenAI enrichment for Salesforce errors.
  */
 
 const OpenAI = require("openai");
 const logger = require("./logger");
-const { classifyError, preClassify } = require("./classifier");
+const { investigateError } = require("./investigator");
 const { getHelpArticle } = require("./helpArticles");
 
-// ─── OpenAI Client ────────────────────────────────────────────────────────────
 let openai;
 function getOpenAI() {
   if (!openai) {
@@ -17,95 +16,127 @@ function getOpenAI() {
   return openai;
 }
 
-// ─── AI Prompt Builder ────────────────────────────────────────────────────────
-function buildPrompt({ errorText, object, context, url, classification }) {
-  return `You are a senior Salesforce architect and support engineer with deep expertise in Salesforce Lightning, Apex, Flows, CPQ, and security models.
+const VALID_CATEGORIES = [
+  "VALIDATION", "PERMISSION", "FLOW", "APEX", "CPQ", "DATA", "LOCK",
+  "REQUIRED_FIELD", "NULL_POINTER", "INTEGRATION", "APPROVAL", "EMAIL",
+  "SHARING", "UNKNOWN",
+];
 
-A Salesforce user encountered the following error. Analyze it and return a structured JSON response.
+function buildPrompt({ errorText, object, context, url, classification, investigation }) {
+  return `You are a senior Salesforce architect. A user hit an error that was pre-investigated.
 
-## Error Details
-- **Error Message**: ${errorText}
-- **Salesforce Object**: ${object || "Unknown"}
-- **Page Context**: ${context || "Unknown"}
-- **URL**: ${url || "Not provided"}
-- **Pre-classified Category**: ${classification.category} (${classification.label})
-- **Failure Type**: ${classification.failureType}
-- **Classifier Confidence**: ${classification.confidence}
+## Error Message
+${errorText}
+
+## Context
+- Object: ${object || "Unknown"}
+- Page: ${context || "Unknown"}
+- URL: ${url || "N/A"}
+
+## Pre-Investigation (trust this unless clearly wrong)
+- Category: ${classification.label} (${classification.failureType})
+- Headline: ${investigation.headline}
+- Narrative: ${investigation.narrative}
+${investigation.flowName ? `- Flow Name: ${investigation.flowName}` : ""}
+${investigation.flowElement ? `- Failing Element: ${investigation.flowElement}` : ""}
+${investigation.fieldName ? `- Field Involved: ${investigation.fieldName}` : ""}
 
 ## Task
-1. Identify the root cause of this error in plain English (2-3 sentences max).
-2. Provide 3-6 actionable, step-by-step fix instructions. Each step should say exactly WHERE in Salesforce to make the change (e.g., Setup > Object Manager > Opportunity > Validation Rules).
-3. Confirm or correct the error category: VALIDATION, PERMISSION, FLOW, APEX, CPQ, DATA, LOCK, REQUIRED_FIELD, NULL_POINTER, UNKNOWN.
-4. Estimate your confidence (0.0 to 1.0) based on how specific the error message is.
+Return JSON with:
+1. rootCause — 2-3 sentences explaining WHY this failed (name the flow/field if known)
+2. fixSteps — 3-6 steps with exact Setup navigation paths
+3. category — confirm or correct: ${VALID_CATEGORIES.join(", ")}
+4. confidence — 0.0 to 1.0
 
-## Output Format (STRICT JSON, no markdown, no preamble)
 {
   "rootCause": "string",
-  "fixSteps": ["string", "string", "string"],
-  "category": "VALIDATION|PERMISSION|FLOW|APEX|CPQ|DATA|LOCK|REQUIRED_FIELD|NULL_POINTER|UNKNOWN",
-  "confidence": 0.0
+  "fixSteps": ["string"],
+  "category": "FLOW",
+  "confidence": 0.9
 }`;
 }
 
-function buildAnalysisPayload(classification, parsed, errorText, context) {
-  const validCategories = [
-    "VALIDATION", "PERMISSION", "FLOW", "APEX", "CPQ",
-    "DATA", "LOCK", "REQUIRED_FIELD", "NULL_POINTER", "UNKNOWN",
-  ];
+function buildAnalysisPayload(investigationResult, parsed, errorText, context, objectHint) {
+  const { classification, investigation } = investigationResult;
 
-  let category = validCategories.includes(parsed.category) ? parsed.category : classification.category;
-  if (category === "UNKNOWN" && classification.category !== "UNKNOWN") {
-    category = classification.category;
-  }
+  let category = VALID_CATEGORIES.includes(parsed?.category)
+    ? parsed.category
+    : classification.category;
 
-  const finalClassification = {
-    ...classification,
-    category,
-    label:
-      classification.category === category
-        ? classification.label
-        : category.replace(/_/g, " "),
-  };
+  const finalClassification = { ...classification, category };
+  const helpArticle = getHelpArticle(finalClassification, errorText, context, investigation);
 
-  const helpArticle = getHelpArticle(finalClassification, errorText, context);
+  const rootCause =
+    parsed?.rootCause ||
+    investigation.narrative ||
+    helpArticle.investigationSummary ||
+    helpArticle.summary;
+
+  const fixSteps =
+    Array.isArray(parsed?.fixSteps) && parsed.fixSteps.length
+      ? parsed.fixSteps.map(String).slice(0, 8)
+      : investigation.suggestedActions?.length
+        ? investigation.suggestedActions
+        : helpArticle.quickChecks;
 
   return {
-    rootCause: String(parsed.rootCause || helpArticle.summary),
-    fixSteps: Array.isArray(parsed.fixSteps)
-      ? parsed.fixSteps.map(String).slice(0, 8)
-      : helpArticle.quickChecks,
+    rootCause: String(rootCause),
+    fixSteps,
     category,
-    failureType: finalClassification.failureType || category.toLowerCase(),
-    failureLabel: helpArticle.categoryLabel || finalClassification.label,
+    failureType: finalClassification.failureType,
+    failureLabel: finalClassification.label,
     confidence: Math.max(
-      classification.confidence,
-      Math.max(0, Math.min(1, Number(parsed.confidence) || 0.5))
+      finalClassification.confidence,
+      Math.max(0, Math.min(1, Number(parsed?.confidence) || 0.5))
     ),
+    investigation: {
+      headline: investigation.headline,
+      narrative: investigation.narrative,
+      failureLayer: investigation.failureLayer,
+      scenarioId: investigation.scenarioId,
+      flowName: investigation.flowName,
+      flowElement: investigation.flowElement,
+      fieldName: investigation.fieldName,
+      objectName: investigation.objectName || objectHint,
+      apexClass: investigation.apexClass,
+      secondaryCategories: investigation.secondaryCategories || [],
+    },
     helpArticle: {
       title: helpArticle.title,
-      summary: helpArticle.summary,
+      summary: helpArticle.investigationSummary || helpArticle.summary,
       url: helpArticle.url,
       setupPath: helpArticle.setupPath,
       quickChecks: helpArticle.quickChecks,
+      secondaryArticle: helpArticle.secondaryArticle || null,
+      flowName: helpArticle.flowName,
+      flowElement: helpArticle.flowElement,
+      fieldName: helpArticle.fieldName,
     },
     classifier: {
       matchedPatterns: classification.matchedPatterns,
       preCategory: classification.category,
+      isComposite: !!classification.isComposite,
     },
   };
 }
 
-// ─── AI Call ──────────────────────────────────────────────────────────────────
 async function analyzeWithAI(params) {
   const { errorText, object, context, url } = params;
+  const investigationResult = investigateError(errorText, context, object);
 
-  const classification = classifyError(errorText, context);
-  logger.debug("Pre-classification result", {
-    classification,
-    errorText: errorText.slice(0, 100),
+  logger.debug("Investigation result", {
+    scenario: investigationResult.investigation.scenarioId,
+    headline: investigationResult.investigation.headline,
   });
 
-  const prompt = buildPrompt({ errorText, object, context, url, classification });
+  const prompt = buildPrompt({
+    errorText,
+    object,
+    context,
+    url,
+    classification: investigationResult.classification,
+    investigation: investigationResult.investigation,
+  });
 
   const ai = getOpenAI();
   const response = await ai.chat.completions.create({
@@ -113,13 +144,12 @@ async function analyzeWithAI(params) {
     messages: [
       {
         role: "system",
-        content:
-          "You are a Salesforce expert assistant. Always respond with valid JSON only. No markdown, no explanation outside JSON.",
+        content: "Salesforce expert. Respond with valid JSON only.",
       },
       { role: "user", content: prompt },
     ],
     temperature: 0.2,
-    max_tokens: 800,
+    max_tokens: 900,
     response_format: { type: "json_object" },
   });
 
@@ -134,87 +164,16 @@ async function analyzeWithAI(params) {
     throw new Error("AI returned invalid JSON");
   }
 
-  return buildAnalysisPayload(classification, parsed, errorText, context);
+  return buildAnalysisPayload(investigationResult, parsed, errorText, context, object);
 }
 
-// ─── Fallback (offline / no API key) ─────────────────────────────────────────
-function buildFallbackResponse(errorText, context) {
-  const classification = classifyError(errorText, context);
-  const helpArticle = getHelpArticle(classification, errorText, context);
-
-  const FALLBACK_ADVICE = {
-    VALIDATION: {
-      rootCause:
-        "A Salesforce validation rule is preventing this record from being saved. The rule enforces a business requirement that the current field values do not satisfy.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    REQUIRED_FIELD: {
-      rootCause:
-        "A required field is missing on save. Check page layout requirements, field definitions, or automation that clears values.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    PERMISSION: {
-      rootCause:
-        "The current user does not have the required permissions to perform this action. This could be due to profile settings, permission sets, field-level security, or object-level access.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    FLOW: {
-      rootCause:
-        "A Salesforce Flow encountered an error during execution. This is often caused by missing required fields, invalid record IDs, or logic errors within the flow.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    APEX: {
-      rootCause:
-        "An Apex trigger or class threw an exception during execution. This may be due to governor limits, null references, or business logic errors in custom code.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    CPQ: {
-      rootCause:
-        "A Salesforce CPQ rule or calculation failed. Review product rules, pricing rules, and quote line configuration.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    DATA: {
-      rootCause:
-        "A data integrity rule blocked the save—duplicate detection, invalid lookup, or malformed record reference.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    LOCK: {
-      rootCause:
-        "The record is currently locked by another operation (usually a workflow, trigger, or another user), preventing simultaneous updates.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    NULL_POINTER: {
-      rootCause:
-        "Apex code dereferenced a null object or field. Add null checks before accessing relationship fields or query results.",
-      fixSteps: helpArticle.quickChecks,
-    },
-    UNKNOWN: {
-      rootCause: helpArticle.summary,
-      fixSteps: helpArticle.quickChecks,
-    },
-  };
-
-  const advice = FALLBACK_ADVICE[classification.category] || FALLBACK_ADVICE.UNKNOWN;
-
-  return {
-    rootCause: advice.rootCause,
-    fixSteps: advice.fixSteps,
-    category: classification.category,
-    failureType: classification.failureType,
-    failureLabel: classification.label,
-    confidence: classification.confidence,
-    helpArticle: {
-      title: helpArticle.title,
-      summary: helpArticle.summary,
-      url: helpArticle.url,
-      setupPath: helpArticle.setupPath,
-      quickChecks: helpArticle.quickChecks,
-    },
-    classifier: {
-      matchedPatterns: classification.matchedPatterns,
-      preCategory: classification.category,
-    },
-  };
+function buildFallbackResponse(errorText, context, object) {
+  const investigationResult = investigateError(errorText, context, object);
+  return buildAnalysisPayload(investigationResult, null, errorText, context, object);
 }
 
-module.exports = { analyzeWithAI, preClassify, classifyError, buildFallbackResponse };
+function preClassify(errorText, context) {
+  return investigateError(errorText, context).classification.category;
+}
+
+module.exports = { analyzeWithAI, preClassify, buildFallbackResponse, investigateError };

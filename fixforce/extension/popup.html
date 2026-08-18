@@ -524,6 +524,37 @@
       border: 1px solid var(--border2);
       color: var(--text-muted);
     }
+
+    .investigation-headline {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+
+    .investigation-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .investigation-meta .pill { font-size: 9px; }
+
+    .investigation-card .card-header {
+      background: linear-gradient(90deg, rgba(139,92,246,0.1), transparent);
+    }
+
+    .secondary-help-link {
+      display: block;
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .secondary-help-link:hover { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -612,6 +643,19 @@
         <div id="error-text-preview">—</div>
       </div>
 
+      <!-- Investigation -->
+      <div class="card investigation-card" id="investigation-card">
+        <div class="card-header">
+          <span class="card-icon">🕵️</span>
+          <span class="card-title">Investigation</span>
+        </div>
+        <div class="card-body">
+          <div class="investigation-headline" id="investigation-headline">—</div>
+          <div class="investigation-meta" id="investigation-meta"></div>
+          <div class="root-cause-text" id="investigation-narrative">—</div>
+        </div>
+      </div>
+
       <!-- Root Cause -->
       <div class="card">
         <div class="card-header">
@@ -637,6 +681,7 @@
           <a class="help-link-btn" id="help-article-link" href="#" target="_blank" rel="noopener noreferrer">
             Open Salesforce Help ↗
           </a>
+          <a class="secondary-help-link hidden" id="secondary-help-link" href="#" target="_blank" rel="noopener noreferrer"></a>
         </div>
       </div>
 
@@ -658,10 +703,11 @@
 
   <!-- Footer -->
   <footer>
-    <span>FixForce v1.1</span>
+    <span>FixForce v1.2</span>
     <span class="footer-link" id="footer-history">📋 History</span>
   </footer>
 
+  <script src="investigator.js"></script>
   <script src="errorIntelligence.js"></script>
   <script src="popup.js"></script>
 </body>

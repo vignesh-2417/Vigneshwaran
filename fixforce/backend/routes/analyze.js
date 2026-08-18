@@ -82,7 +82,7 @@ router.post("/", async (req, res) => {
         analysis = await analyzeWithAI({ errorText, object, url, context });
       } catch (aiErr) {
         logger.warn("OpenAI call failed, using fallback", { error: aiErr.message, requestId });
-        analysis = buildFallbackResponse(errorText, context);
+        analysis = buildFallbackResponse(errorText, context, object);
         analysis._fallback = true;
       }
     } else {
