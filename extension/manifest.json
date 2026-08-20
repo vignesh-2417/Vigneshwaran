@@ -19,7 +19,7 @@
         "https://login.salesforce.com/*",
         "https://test.salesforce.com/*"
       ],
-      "js": ["dist/content.js"],
+      "js": ["process-shim.js", "dist/content.js"],
       "run_at": "document_idle",
       "all_frames": false
     }

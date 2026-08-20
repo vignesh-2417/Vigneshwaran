@@ -1,23 +1,37 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
-const file = resolve(process.cwd(), "dist/content.js");
-const source = readFileSync(file, "utf8");
-const failures = [];
-
-if (!source.startsWith("var process={env:{NODE_ENV:")) {
-  failures.push("content.js must start with a process.env NODE_ENV shim");
+const bundle = join(process.cwd(), "dist", "content.js");
+const shim = join(process.cwd(), "dist", "process-shim.js");
+if (!existsSync(bundle)) {
+  console.error("Missing dist/content.js");
+  process.exit(1);
 }
-if (source.includes("react.development.js")) {
-  failures.push("content.js must not include React development sources");
-}
-if (source.includes("process.env.NODE_ENV")) {
-  failures.push("content.js must not contain leftover process.env.NODE_ENV lookups");
-}
-
-if (failures.length > 0) {
-  console.error(failures.join("\n"));
+if (!existsSync(shim)) {
+  console.error("Missing dist/process-shim.js (copied from extension/process-shim.js)");
   process.exit(1);
 }
 
-console.log("content.js bundle checks passed");
+const source = readFileSync(bundle, "utf8");
+const failures = [];
+
+if (!source.startsWith('var process={env:{NODE_ENV:')) {
+  failures.push("content.js must start with a process.env shim so Lightning pages do not crash");
+}
+
+if (source.includes("react.development.js")) {
+  failures.push("content.js still contains react.development.js");
+}
+
+if (source.includes("process.env.NODE_ENV")) {
+  failures.push("content.js still contains leftover process.env.NODE_ENV");
+}
+
+if (failures.length > 0) {
+  for (const failure of failures) {
+    console.error(failure);
+  }
+  process.exit(1);
+}
+
+console.log("content.js production bundle checks passed");
