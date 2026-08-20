@@ -145,6 +145,17 @@ describe("assistant panel", () => {
     expect(screen.getByRole("button", { name: "Approve plan" })).toBeEnabled();
   });
 
+  it("lists every Salesforce field data type in the composer", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    expect(screen.getByLabelText("Field data type")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Text Area (Rich)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Picklist (Multi-Select)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Roll-Up Summary" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "External Lookup Relationship" })).toBeInTheDocument();
+  });
+
   it("supports keyboard activation of the floating icon", async () => {
     const user = userEvent.setup();
     renderApp();

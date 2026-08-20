@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  applyFieldTypeHint,
   deriveSalesforceLoginHost,
   detectSalesforceContext,
+  type FieldCatalogId,
   type SalesforceContext
 } from "@sfcopilot/shared";
 import type { AssistantApi, SalesforceAuthState } from "../api/assistantApi.js";
@@ -42,6 +44,7 @@ export function CopilotApp({
     open: initialOpen
   });
   const [requirement, setRequirement] = useState("");
+  const [fieldTypeId, setFieldTypeId] = useState<FieldCatalogId | "infer">("infer");
   const [position, setPosition] = useState<IconPosition>(initialPosition);
   const [auth, setAuth] = useState<SalesforceAuthState>(ANONYMOUS);
   const [loginHost, setLoginHost] = useState(() =>
@@ -87,11 +90,12 @@ export function CopilotApp({
       open: current.open
     }));
     setRequirement("");
+    setFieldTypeId("infer");
   };
 
   const submit = async () => {
-    const text = requirement.trim();
-    if (!text) {
+    const text = applyFieldTypeHint(requirement.trim(), fieldTypeId);
+    if (!requirement.trim()) {
       setState((current) => ({
         ...current,
         status: "error",
@@ -217,8 +221,10 @@ export function CopilotApp({
           top={position.top + 64}
           right={position.right}
           requirement={requirement}
+          fieldTypeId={fieldTypeId}
           authenticated={auth.authenticated}
           onRequirementChange={setRequirement}
+          onFieldTypeChange={setFieldTypeId}
           onClose={close}
           onMinimize={() =>
             setState((current) => ({ ...current, minimized: !current.minimized }))

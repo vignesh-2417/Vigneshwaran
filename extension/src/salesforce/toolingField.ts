@@ -1,4 +1,4 @@
-import type { ParsedCustomFieldRequest } from "@sfcopilot/shared";
+import { customFieldMetadataRecord, type ParsedCustomFieldRequest } from "@sfcopilot/shared";
 
 const API_VERSION = "62.0";
 
@@ -6,25 +6,9 @@ export function toolingCustomFieldPayload(field: ParsedCustomFieldRequest): {
   FullName: string;
   Metadata: Record<string, unknown>;
 } {
-  const metadata: Record<string, unknown> = {
-    type: field.fieldType,
-    label: field.label,
-    required: false
-  };
-  if (field.fieldType === "Text") {
-    metadata.length = 255;
-  }
-  if (field.fieldType === "LongTextArea") {
-    metadata.length = 32768;
-    metadata.visibleLines = 5;
-  }
-  if (field.fieldType === "Number" || field.fieldType === "Currency" || field.fieldType === "Percent") {
-    metadata.precision = 18;
-    metadata.scale = field.fieldType === "Number" ? 0 : 2;
-  }
   return {
     FullName: `${field.objectApiName}.${field.apiName}`,
-    Metadata: metadata
+    Metadata: customFieldMetadataRecord(field)
   };
 }
 

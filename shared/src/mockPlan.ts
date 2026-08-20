@@ -4,9 +4,11 @@ import type {
   OperatingMode,
   TaskReport
 } from "./schemas.js";
-import { parseCustomFieldRequirement } from "./fieldParse.js";
+import { buildCustomFieldXml, parseCustomFieldRequirement } from "./fieldParse.js";
 
 export {
+  applyFieldTypeHint,
+  buildCustomFieldXml,
   parseCustomFieldRequirement,
   toCustomFieldApiName,
   type ParsedCustomFieldRequest
@@ -78,21 +80,8 @@ export const OPERATING_MODES: readonly OperatingMode[] = [
 export const GOVERNED_NO_DEPLOY_WARNING =
   "Correctness and reviewability come first. Source-format metadata was generated in ANALYZE→REVIEW. DEPLOY is never automatic, never production, and requires a sandbox or scratch org with a check-only pass plus explicit human approval.";
 
-function fieldXml(label: string, apiName: string, fieldType: string): string {
-  const extra =
-    fieldType === "Text"
-      ? "\n  <length>255</length>"
-      : fieldType === "LongTextArea"
-        ? "\n  <length>32768</length>\n  <visibleLines>5</visibleLines>"
-        : fieldType === "Number"
-          ? "\n  <precision>18</precision>\n  <scale>0</scale>"
-          : "";
-  return `<CustomField>
-  <fullName>${apiName}</fullName>
-  <label>${label}</label>
-  <type>${fieldType}</type>${extra}
-  <required>false</required>
-</CustomField>`;
+function fieldXml(field: ReturnType<typeof parseCustomFieldRequirement>): string {
+  return buildCustomFieldXml(field);
 }
 
 function buildTaskReport(
@@ -178,11 +167,24 @@ export function buildGovernedMetadataTask(
   const filePath = `force-app/main/default/objects/${field.objectApiName}/fields/${field.apiName}.field-meta.xml`;
   const wantsFlow = /\bflow\b/i.test(requirement);
   const wantsApex = /\bapex\b|\btrigger\b/i.test(requirement);
+  if (field.clarifyingQuestions.length > 0) {
+    return {
+      ...buildAnalyzeModeResponse(correlationId, field.clarifyingQuestions),
+      structuredRequirement: {
+        summary: requirement.slice(0, 500),
+        objectApiName: field.objectApiName,
+        requestedChanges: [
+          `Need more detail to generate ${field.displayName} field ${field.apiName} on ${field.objectApiName}`
+        ]
+      }
+    };
+  }
+
   const report = buildTaskReport(
     requirement,
     field.objectApiName,
     field.apiName,
-    field.fieldType,
+    field.catalogId === "Formula" ? `Formula (${field.fieldType})` : field.displayName,
     filePath,
     wantsFlow,
     wantsApex
@@ -196,7 +198,9 @@ export function buildGovernedMetadataTask(
     structuredRequirement: {
       summary: requirement.slice(0, 500),
       objectApiName: field.objectApiName,
-      requestedChanges: [`Generate ${field.apiName} (${field.fieldType}) on ${field.objectApiName} in source format`]
+      requestedChanges: [
+        `Generate ${field.apiName} (${field.displayName}, metadata type ${field.fieldType}) on ${field.objectApiName} in source format`
+      ]
     },
     implementationPlan: [
       {
@@ -241,7 +245,7 @@ export function buildGovernedMetadataTask(
         filePath,
         metadataType: "CustomField",
         before: null,
-        after: fieldXml(field.label, field.apiName, field.fieldType)
+        after: fieldXml(field)
       }
     ],
     validation: {

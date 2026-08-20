@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseCustomFieldRequirement } from "@sfcopilot/shared";
 import { buildLoginEnvelope, parseSoapLoginResponse } from "../src/salesforce/soapLogin.js";
 import { toolingCustomFieldPayload } from "../src/salesforce/toolingField.js";
 
@@ -27,12 +28,12 @@ describe("SOAP login helpers", () => {
 describe("Tooling custom field payload", () => {
   it("builds Account.COP_Text__c as Text(255)", () => {
     expect(
-      toolingCustomFieldPayload({
-        label: "COP Text",
-        apiName: "COP_Text__c",
-        fieldType: "Text",
-        objectApiName: "Account"
-      })
+      toolingCustomFieldPayload(
+        parseCustomFieldRequirement(
+          'Create a custom text field "COP Text" in Account object',
+          null
+        )
+      )
     ).toEqual({
       FullName: "Account.COP_Text__c",
       Metadata: {

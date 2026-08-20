@@ -1,7 +1,9 @@
 import {
+  FIELD_TYPE_GROUPS,
   OPERATING_MODES,
   PRODUCT_NAME,
-  type AnalyzeSuccessResponse
+  type AnalyzeSuccessResponse,
+  type FieldCatalogId
 } from "@sfcopilot/shared";
 import type { FormEvent, ReactNode } from "react";
 import type { AssistantState } from "./assistantState.js";
@@ -12,10 +14,12 @@ interface AssistantPanelProps {
   top: number;
   right: number;
   requirement: string;
+  fieldTypeId: FieldCatalogId | "infer";
   authenticated: boolean;
   signedInAs?: string | null;
   loginSlot?: ReactNode;
   onRequirementChange: (value: string) => void;
+  onFieldTypeChange: (value: FieldCatalogId | "infer") => void;
   onClose: () => void;
   onMinimize: () => void;
   onReset: () => void;
@@ -30,10 +34,12 @@ export function AssistantPanel({
   top,
   right,
   requirement,
+  fieldTypeId,
   authenticated,
   signedInAs,
   loginSlot,
   onRequirementChange,
+  onFieldTypeChange,
   onClose,
   onMinimize,
   onReset,
@@ -136,6 +142,26 @@ export function AssistantPanel({
             ) : null}
           </div>
           <form className="composer" onSubmit={onFormSubmit}>
+            <label htmlFor="sfcopilot-field-type">Field data type</label>
+            <select
+              id="sfcopilot-field-type"
+              className="field-type-select"
+              value={fieldTypeId}
+              onChange={(event) =>
+                onFieldTypeChange(event.target.value as FieldCatalogId | "infer")
+              }
+            >
+              <option value="infer">Infer from requirement</option>
+              {FIELD_TYPE_GROUPS.map((group) => (
+                <optgroup key={group.category} label={group.category}>
+                  {group.types.map((entry) => (
+                    <option key={entry.id} value={entry.id} title={entry.summary}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <label htmlFor="sfcopilot-requirement">Salesforce requirement</label>
             <textarea
               id="sfcopilot-requirement"

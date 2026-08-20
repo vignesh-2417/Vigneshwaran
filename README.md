@@ -40,7 +40,7 @@ The huge “error” dump that starts with `var uN=Object.defineProperty` is the
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.6** and click **Reload**
+2. On `chrome://extensions`, confirm version **0.1.7** and click **Reload**
 3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
@@ -54,6 +54,8 @@ Do not load a parent folder, zip, or a stale copy that still has `content.js` st
 - Username, password, and optional security token stay in `chrome.storage.session` only (not in git)
 - After sign-in, a larger Inter-font review panel shows ANALYZE through REVIEW
 - **Run ANALYZE** produces source-format metadata and a nine-part report
+- Choose a **Field data type** (Text through External Lookup) or leave Infer from requirement
+- Picklist, formula, roll-up, and relationship fields ask clarifying questions when required extras are missing
 - **Approve plan** records human review; it does not deploy
 - DEPLOY is never automatic and never production
 - If you are not signed in, Submit asks you to log in instead of showing `Failed to fetch`

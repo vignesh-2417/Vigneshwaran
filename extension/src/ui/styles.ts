@@ -37,7 +37,7 @@ export const COPILOT_CSS = `
   pointer-events: none;
 }
 
-button, textarea {
+button, textarea, select {
   font: inherit;
 }
 
@@ -381,17 +381,27 @@ button, textarea {
   border-top: 1px solid #ffb347;
 }
 
-.composer textarea {
+.composer textarea,
+.composer .field-type-select {
   width: 100%;
-  min-height: 72px;
-  resize: vertical;
   border: 1px solid #ffb347;
   border-radius: 8px;
   padding: 8px;
   background: #fffdf8;
+  color: #3b1400;
 }
 
-.composer textarea:focus-visible {
+.composer textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.composer .field-type-select {
+  min-height: 36px;
+}
+
+.composer textarea:focus-visible,
+.composer .field-type-select:focus-visible {
   outline: 2px solid #ff6a00;
   border-color: #ff6a00;
 }
