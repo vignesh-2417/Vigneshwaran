@@ -5,6 +5,7 @@
  */
 
 const { classifyError } = require("./classifier");
+const { HELP_ARTICLES } = require("./helpArticles");
 
 const PERMISSION_SIGNALS = [
   /INSUFFICIENT_ACCESS/i,
@@ -13,6 +14,8 @@ const PERMISSION_SIGNALS = [
   /no access/i,
   /permission denied/i,
   /you do not have access/i,
+  /you do not have the level of access/i,
+  /custom permission/i,
   /access denied/i,
   /unauthorized/i,
   /field-level security/i,
@@ -195,6 +198,7 @@ const EXTRACTION_PATTERNS = {
   fieldName: [
     /MALFORMED_ID:\s*([^:]+?):\s*id value/i,
     /field[s]?\s+["']([^"']+)["']/i,
+    /cannot update the field\s+([A-Za-z0-9_]+)/i,
     /fields?:\s*([A-Za-z0-9_,\s__]+?)(?:\.|$|\s+are|\s+is)/i,
     /\[([A-Za-z0-9_]+)\]/,
     /column\s+["']?([A-Za-z0-9_]+)/i,
@@ -202,6 +206,10 @@ const EXTRACTION_PATTERNS = {
   invalidValue: [
     /id value of incorrect type:\s*(\S+)/i,
     /incorrect type:\s*([^\s.]+)/i,
+  ],
+  validationRuleName: [
+    /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
+    /validation rule\s+["']([^"']+)["']/i,
   ],
   apexClass: [
     /Class\.([A-Za-z0-9_]+)/,
@@ -243,6 +251,9 @@ function detectSignals(text) {
     hasCpq: /SBQQ|CPQ|steelbrick/i.test(text),
     hasLock: /unable to lock|record is locked/i.test(text),
     hasMalformedId: /MALFORMED_ID|malformed_id|id value of incorrect type|incorrect type/i.test(text),
+    hasLicense: /FUNCTIONALITY_NOT_ENABLED|user license|license type|not enabled for your user license|license limit exceeded|requires an additional license|edition does not include|feature is not available|not available in your salesforce edition|installed package requires/i.test(
+      text
+    ),
   };
 }
 
@@ -253,6 +264,7 @@ function extractDetails(errorText, objectHint) {
     flowElement: firstMatch(text, EXTRACTION_PATTERNS.flowElement),
     fieldName: firstMatch(text, EXTRACTION_PATTERNS.fieldName)?.trim(),
     invalidValue: firstMatch(text, EXTRACTION_PATTERNS.invalidValue),
+    validationRuleName: firstMatch(text, EXTRACTION_PATTERNS.validationRuleName),
     apexClass: firstMatch(text, EXTRACTION_PATTERNS.apexClass),
     objectName: firstMatch(text, EXTRACTION_PATTERNS.objectName) || objectHint || null,
   };
@@ -362,8 +374,46 @@ function buildSingleCategoryInvestigation(signals, details, context) {
     classification.category = "SHARING";
     classification.failureType = "sharing";
     classification.label = "Sharing / OWD Issue";
+    headline = "Sharing or organization-wide defaults blocked access";
+    narrative =
+      "The user cannot access or transfer this record due to sharing rules, OWD, or record ownership.";
     helpArticleKey = "SHARING";
     failureLayer = "security";
+    suggestedActions = HELP_ARTICLES.SHARING?.quickChecks || [];
+  } else if (signals.hasLicense) {
+    classification.category = "LICENSE";
+    classification.failureType = "license";
+    classification.label = "License / Edition";
+    headline = "Feature or user license does not allow this action";
+    narrative =
+      "The org edition, user license type, or installed package license does not include this feature. An admin must assign the correct license or enable the capability.";
+    helpArticleKey = "LICENSE";
+    failureLayer = "licensing";
+    suggestedActions = HELP_ARTICLES.LICENSE?.quickChecks || [];
+  } else if (signals.hasValidation && !signals.hasFlow) {
+    classification.category = "VALIDATION";
+    classification.failureType = "validation_rule";
+    classification.label = "Validation Rule";
+    headline = details.validationRuleName
+      ? `Validation rule "${details.validationRuleName}" blocked the save`
+      : "Validation rule blocked the save";
+    narrative =
+      "A validation rule on the object rejected the field values. Review the rule formula and update the record or adjust the rule.";
+    helpArticleKey = "VALIDATION";
+    failureLayer = "validation";
+    suggestedActions = HELP_ARTICLES.VALIDATION?.quickChecks || [];
+  } else if (signals.hasPermission && !signals.hasFlow && !signals.hasApex) {
+    classification.category = "PERMISSION";
+    classification.failureType = "permission";
+    classification.label = "Permission / Access";
+    headline = details.fieldName
+      ? `Insufficient access to field "${details.fieldName}"`
+      : "Insufficient permissions to perform this action";
+    narrative =
+      "The running user lacks object permissions, field-level security, sharing access, or a required custom permission.";
+    helpArticleKey = "PERMISSION";
+    failureLayer = "security";
+    suggestedActions = HELP_ARTICLES.PERMISSION?.quickChecks || [];
   } else if (signals.hasFlow && details.flowName) {
     headline = `Flow "${details.flowName}" failed`;
     narrative = `The flow "${details.flowName}"${details.flowElement ? ` failed at element "${details.flowElement}"` : ""}. Use Flow Debug to trace the exact step.`;

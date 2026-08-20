@@ -20,6 +20,9 @@
     "MALFORMED_ID",
     "FIELD_CUSTOM_VALIDATION_EXCEPTION",
     "INSUFFICIENT_ACCESS",
+    "FUNCTIONALITY_NOT_ENABLED",
+    "user license",
+    "not enabled for your user license",
   ];
 
   const ERROR_SELECTORS = [
@@ -92,6 +95,8 @@
       /MALFORMED_ID[\s\S]{0,600}/i,
       /FIELD_CUSTOM_VALIDATION_EXCEPTION[\s\S]{0,600}/i,
       /INSUFFICIENT_ACCESS[\s\S]{0,600}/i,
+      /FUNCTIONALITY_NOT_ENABLED[\s\S]{0,600}/i,
+      /not enabled for your user license[\s\S]{0,400}/i,
       /process failed[\s\S]{0,1200}/i,
       /the flow tried to update[\s\S]{0,1200}/i,
     ];

@@ -16,6 +16,7 @@ const CATEGORY_META = {
   REQUIRED_FIELD: { label: "Required Field",   color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "📝" },
   NULL_POINTER:   { label: "Null Reference",   color: "#06b6d4", bg: "rgba(6,182,212,0.12)",   icon: "🚫" },
   UNKNOWN:        { label: "Unknown Error",    color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "❓" },
+  LICENSE:        { label: "License / Edition", color: "#a855f7", bg: "rgba(168,85,247,0.12)",  icon: "🎫" },
 };
 
 // ─── DOM Refs ─────────────────────────────────────────────────────────────────

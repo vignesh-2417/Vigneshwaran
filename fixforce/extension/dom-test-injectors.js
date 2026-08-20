@@ -105,6 +105,68 @@ function FF_test_TC09() {
   `);
 }
 
+// ─── TC11: Standalone validation ─────────────────────────────────────────────
+function FF_test_TC11() {
+  return FF_injectError(`
+    Review the errors on this page.<br>
+    FIELD_CUSTOM_VALIDATION_EXCEPTION: Amount must be greater than zero: []
+  `);
+}
+
+// ─── TC12: Validation with rule API name ─────────────────────────────────────
+function FF_test_TC12() {
+  return FF_injectError(`
+    FIELD_CUSTOM_VALIDATION_EXCEPTION: VR_Opportunity_Amount_Check: Amount cannot be negative when Stage is Prospecting
+  `);
+}
+
+// ─── TC13: Object permission ─────────────────────────────────────────────────
+function FF_test_TC13() {
+  return FF_injectError(`
+    INSUFFICIENT_ACCESS_OR_READONLY: insufficient access rights on object id.<br>
+    You do not have the level of access necessary to perform the operation you requested.
+  `);
+}
+
+// ─── TC14: Field-Level Security ──────────────────────────────────────────────
+function FF_test_TC14() {
+  return FF_injectError(`
+    INSUFFICIENT_ACCESS: insufficient privileges on cross-reference entity.<br>
+    You cannot update the field AnnualRevenue because you do not have edit access.
+  `);
+}
+
+// ─── TC15: Sharing / transfer ────────────────────────────────────────────────
+function FF_test_TC15() {
+  return FF_injectError(`
+    INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY: insufficient access rights on cross-reference id.<br>
+    Unable to transfer this record. The new owner must have Read/Write access via role or sharing rule.
+  `);
+}
+
+// ─── TC16: Custom permission ─────────────────────────────────────────────────
+function FF_test_TC16() {
+  return FF_injectError(`
+    You do not have the level of access necessary to perform the operation you requested.<br>
+    Custom Permission "Manage_Quote_Approvals" is required to approve this quote.
+  `);
+}
+
+// ─── TC17: User license tab ──────────────────────────────────────────────────
+function FF_test_TC17() {
+  return FF_injectError(`
+    This tab or page is not enabled for your user license type. Contact your administrator for more information.
+  `);
+}
+
+// ─── TC18: Package / feature license ─────────────────────────────────────────
+function FF_test_TC18() {
+  return FF_injectError(`
+    FUNCTIONALITY_NOT_ENABLED: Installed package requires Lightning Experience User license.
+    Your current user license type does not include this feature.
+  `);
+}
+
 console.log(
-  "[FixForce] DOM test helpers loaded. Run FF_test_TC01() … FF_test_TC09(), or FF_clearInjectedErrors()."
+  "[FixForce] DOM test helpers loaded. Run FF_test_TC01() … FF_test_TC18(), or FF_clearInjectedErrors()."
 );

@@ -1,6 +1,15 @@
-# FixForce — Hard Test Cases (10)
+# FixForce — Hard Test Cases (18)
 
-This guide explains **how to build**, **run**, and **verify** the 10 hard-level FixForce tests.
+This guide explains **how to build**, **run**, and **verify** FixForce tests across **Flow**, **Validation**, **Permission**, and **License** errors.
+
+## Test categories
+
+| IDs | Category | Examples |
+|-----|----------|----------|
+| TC01–TC10 | **Flow** (composite + edge cases) | Flow + malformed ID, permission, validation, dedupe |
+| TC11–TC12 | **Validation rule** (standalone) | Direct save blocked by validation rule |
+| TC13–TC16 | **Permission / sharing** | Object CRUD, FLS, transfer, custom permission |
+| TC17–TC18 | **License / edition** | User license tab, package feature not enabled |
 
 There are **three layers**:
 

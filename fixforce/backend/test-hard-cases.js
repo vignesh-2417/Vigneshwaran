@@ -1,5 +1,5 @@
 /**
- * FixForce – 10 hard-level investigation test cases.
+ * FixForce – hard-level investigation test cases (flow, validation, permission, license).
  *
  * Run: npm test
  * Or:  node test-hard-cases.js
@@ -25,6 +25,7 @@ const { investigateError } = require("./investigator");
  *   expectApexClass?: string;
  *   expectNoScenario?: boolean;
  *   expectHeadlineIncludes?: string;
+ *   expectValidationRule?: string;
  *   minFixSteps?: number;
  * }} HardCase */
 
@@ -163,6 +164,104 @@ const HARD_CASES = [
     expectFlow: "test-nex",
     expectField: "D&B Company ID",
   },
+  // ─── Validation (standalone — no Flow) ─────────────────────────────────────
+  {
+    id: "TC11",
+    name: "Standalone validation rule on record save",
+    text:
+      "Review the errors on this page.\n" +
+      "FIELD_CUSTOM_VALIDATION_EXCEPTION: Amount must be greater than zero: []\n" +
+      "Error ID: 1234567890-12345",
+    context: "record_page",
+    objectHint: "Opportunity",
+    expectCategory: "VALIDATION",
+    expectHeadlineIncludes: "Validation rule",
+    minFixSteps: 2,
+  },
+  {
+    id: "TC12",
+    name: "Validation rule with explicit rule API name",
+    text:
+      "FIELD_CUSTOM_VALIDATION_EXCEPTION: VR_Opportunity_Amount_Check: Amount cannot be negative when Stage is Prospecting",
+    context: "new_record",
+    objectHint: "Opportunity",
+    expectCategory: "VALIDATION",
+    expectValidationRule: "VR_Opportunity_Amount_Check",
+    expectHeadlineIncludes: "VR_Opportunity_Amount_Check",
+    minFixSteps: 2,
+  },
+  // ─── Permission (standalone — no Flow) ─────────────────────────────────────
+  {
+    id: "TC13",
+    name: "Object permission — cannot delete record",
+    text:
+      "INSUFFICIENT_ACCESS_OR_READONLY: insufficient access rights on object id.\n" +
+      "You do not have the level of access necessary to perform the operation you requested. Please contact your administrator.",
+    context: "record_page",
+    objectHint: "Opportunity",
+    expectCategory: "PERMISSION",
+    expectHeadlineIncludes: "Insufficient",
+    minFixSteps: 2,
+  },
+  {
+    id: "TC14",
+    name: "Field-Level Security — cannot edit field",
+    text:
+      "INSUFFICIENT_ACCESS: insufficient privileges on cross-reference entity.\n" +
+      "You cannot update the field AnnualRevenue because you do not have edit access.",
+    context: "record_page",
+    objectHint: "Account",
+    expectCategory: "PERMISSION",
+    expectField: "AnnualRevenue",
+    expectHeadlineIncludes: "AnnualRevenue",
+    minFixSteps: 2,
+  },
+  {
+    id: "TC15",
+    name: "Sharing / transfer ownership blocked",
+    text:
+      "INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY: insufficient access rights on cross-reference id.\n" +
+      "Unable to transfer this record. The new owner must have Read/Write access via role or sharing rule.",
+    context: "record_page",
+    objectHint: "Account",
+    expectCategory: "SHARING",
+    expectHeadlineIncludes: "Sharing",
+  },
+  {
+    id: "TC16",
+    name: "Custom permission missing for feature",
+    text:
+      "You do not have the level of access necessary to perform the operation you requested.\n" +
+      'Custom Permission "Manage_Quote_Approvals" is required to approve this quote.',
+    context: "record_page",
+    objectHint: "SBQQ__Quote__c",
+    expectCategory: "PERMISSION",
+    expectHeadlineIncludes: "Insufficient",
+  },
+  // ─── License / edition ─────────────────────────────────────────────────────
+  {
+    id: "TC17",
+    name: "User license — tab not enabled for license type",
+    text:
+      "This tab or page is not enabled for your user license type. Contact your administrator for more information.",
+    context: "unknown",
+    objectHint: null,
+    expectCategory: "LICENSE",
+    expectHeadlineIncludes: "license",
+    minFixSteps: 2,
+  },
+  {
+    id: "TC18",
+    name: "Feature / package license — FUNCTIONALITY_NOT_ENABLED",
+    text:
+      "FUNCTIONALITY_NOT_ENABLED: Installed package requires Lightning Experience User license. " +
+      "Your current user license type does not include this feature.",
+    context: "unknown",
+    objectHint: null,
+    expectCategory: "LICENSE",
+    expectLabel: "License / Edition",
+    minFixSteps: 2,
+  },
 ];
 
 function assertCase(c, result) {
@@ -204,6 +303,10 @@ function assertCase(c, result) {
     errors.push(`apexClass: expected ${c.expectApexClass}, got ${inv.apexClass}`);
   }
 
+  if (c.expectValidationRule && inv.validationRuleName !== c.expectValidationRule) {
+    errors.push(`validationRuleName: expected ${c.expectValidationRule}, got ${inv.validationRuleName}`);
+  }
+
   if (c.expectHeadlineIncludes && !inv.headline?.includes(c.expectHeadlineIncludes)) {
     errors.push(`headline should include "${c.expectHeadlineIncludes}", got: ${inv.headline}`);
   }
@@ -223,7 +326,7 @@ function assertCase(c, result) {
 }
 
 function run() {
-  console.log("FixForce hard test cases (investigator)\n" + "=".repeat(50));
+  console.log("FixForce hard test cases (flow + validation + permission + license)\n" + "=".repeat(50));
 
   let passed = 0;
   const failures = [];

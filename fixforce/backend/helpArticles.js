@@ -261,6 +261,24 @@ const HELP_ARTICLES = {
       "Reduce parallel updates to the same parent record",
     ],
   },
+  LICENSE: {
+    title: "User Licenses & Feature Availability",
+    summary:
+      "The action requires a user license, add-on license, or edition feature that is not assigned to this user or org. Common causes include wrong user license type, missing permission set license, or a package that needs a specific edition.",
+    url: "https://help.salesforce.com/s/articleView?id=sf.users_license_types.htm&type=5",
+    setupPath: "Setup → Users → [User] → License / Setup → Company Information → Edition",
+    quickChecks: [
+      "Check the user's license type (e.g. Salesforce, Platform, Community)",
+      "Verify the feature is included in your org edition (Professional, Enterprise, Unlimited)",
+      "Assign a permission set license or add-on if the feature requires one",
+      "For installed packages, confirm package license seats are available",
+      "Contact Salesforce account executive if you need edition upgrade or additional licenses",
+    ],
+    secondaryArticle: {
+      title: "Manage User Licenses",
+      url: "https://help.salesforce.com/s/articleView?id=sf.users_license_types.htm&type=5",
+    },
+  },
   NULL_POINTER: {
     title: "Fix Null Reference Errors in Apex",
     summary:

@@ -5,9 +5,10 @@
 (function (global) {
   "use strict";
 
-  const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i];
+  const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i, /do not have edit access/i, /custom permission/i];
   const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i, /process failed/i, /we can't save this record/i, /the flow tried to update/i];
   const VALIDATION_SIGNALS = [/FIELD_CUSTOM_VALIDATION_EXCEPTION/i, /validation rule/i, /validation failed/i];
+  const LICENSE_SIGNALS = [/FUNCTIONALITY_NOT_ENABLED/i, /user license/i, /license type/i, /not enabled for your user license/i, /license limit exceeded/i, /edition does not include/i, /feature is not available/i, /installed package requires/i];
 
   const COMPOSITE_SCENARIOS = [
     {
@@ -93,8 +94,9 @@
     APEX_PERMISSION: { title: "Apex DML Permission Denied", summary: "Apex lacked permissions for DML.", url: "https://help.salesforce.com/s/articleView?id=sf.apex_sharing.htm&type=5", setupPath: "Setup → Apex + Profiles" },
     FLOW: { title: "Troubleshoot Flow Errors", summary: "Flow runtime failure.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
     FLOW_MALFORMED_ID: { title: "Flow Failed — Invalid Lookup ID", summary: "Flow assigned invalid text to a lookup field.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
-    PERMISSION: { title: "User Permissions", summary: "Access denied.", url: "https://help.salesforce.com/s/articleView?id=sf.admin_userperms.htm&type=5", setupPath: "Setup → Users" },
-    VALIDATION: { title: "Validation Rules", summary: "Validation blocked save.", url: "https://help.salesforce.com/s/articleView?id=sf.customize_validations.htm&type=5", setupPath: "Setup → Validation Rules" },
+    PERMISSION: { title: "User Permissions", summary: "Access denied — check profile, permission sets, FLS, and sharing.", url: "https://help.salesforce.com/s/articleView?id=sf.admin_userperms.htm&type=5", setupPath: "Setup → Users → Permission Sets" },
+    VALIDATION: { title: "Validation Rules", summary: "Validation blocked save — review rule formula and field values.", url: "https://help.salesforce.com/s/articleView?id=sf.customize_validations.htm&type=5", setupPath: "Setup → Validation Rules" },
+    LICENSE: { title: "User Licenses & Feature Availability", summary: "User license or org edition does not include this feature.", url: "https://help.salesforce.com/s/articleView?id=sf.users_license_types.htm&type=5", setupPath: "Setup → Users → License" },
     INTEGRATION: { title: "HTTP Callouts", summary: "External callout failed.", url: "https://help.salesforce.com/s/articleView?id=sf.http_callouts.htm&type=5", setupPath: "Setup → Named Credentials" },
     APPROVAL: { title: "Approval Processes", summary: "Approval blocked action.", url: "https://help.salesforce.com/s/articleView?id=sf.approval_processes.htm&type=5", setupPath: "Setup → Approval Processes" },
     UNKNOWN: { title: "Debug Logs", summary: "Investigate with debug logs.", url: "https://help.salesforce.com/s/articleView?id=sf.code_debug_log.htm&type=5", setupPath: "Setup → Debug Logs" },
@@ -112,8 +114,9 @@
     return {
       flowName: firstMatch(text, [/['']([^'']+)['']\s+process\s+failed/i, /because the\s+['']([^'']+)['']\s+process/i, /flow\s+["']([^"']+)["']/i]),
       flowElement: firstMatch(text, [/element\s+["']([^"']+)["']/i, /at element\s+["']?([A-Za-z0-9_]+)/i]),
-      fieldName: firstMatch(text, [/MALFORMED_ID:\s*([^:]+?):\s*id value/i, /field[s]?\s+["']([^"']+)["']/i]),
+      fieldName: firstMatch(text, [/MALFORMED_ID:\s*([^:]+?):\s*id value/i, /field[s]?\s+["']([^"']+)["']/i, /cannot update the field\s+([A-Za-z0-9_]+)/i]),
       invalidValue: firstMatch(text, [/id value of incorrect type:\s*(\S+)/i]),
+      validationRuleName: firstMatch(text, [/FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i]),
       apexClass: firstMatch(text, [/Class\.([A-Za-z0-9_]+)/, /Trigger\.([A-Za-z0-9_]+)/]),
       objectName: firstMatch(text, [/object\s+["']([^"']+)["']/i]) || objectHint || null,
     };
@@ -131,6 +134,7 @@
       hasMalformedId: /MALFORMED_ID|id value of incorrect type/i.test(text),
       hasIntegration: /callout|http request|named credential/i.test(text),
       hasApproval: /approval process|submit for approval/i.test(text),
+      hasLicense: LICENSE_SIGNALS.some((p) => p.test(text)),
     };
   }
 
@@ -170,15 +174,24 @@
     if (signals.hasApproval) {
       return makeSimple("APPROVAL", "approval", "Approval Process", "Approval process blocked the action.", details);
     }
+    if (signals.hasLicense) {
+      return makeSimple("LICENSE", "license", "License / Edition", "Feature or user license does not allow this action.", details);
+    }
     if (signals.hasFlow) {
       const h = details.flowName ? `Flow "${details.flowName}" failed` : "Flow runtime error";
       return makeSimple("FLOW", "flow", "Flow Error", h, details);
     }
     if (signals.hasPermission) {
-      return makeSimple("PERMISSION", "permission", "Permission Error", "User lacks required access.", details);
+      const h = details.fieldName
+        ? `Insufficient access to field "${details.fieldName}"`
+        : "Insufficient permissions to perform this action";
+      return makeSimple("PERMISSION", "permission", "Permission / Access", h, details);
     }
     if (signals.hasValidation) {
-      return makeSimple("VALIDATION", "validation", "Validation Rule", "Validation rule blocked the save.", details);
+      const h = details.validationRuleName
+        ? `Validation rule "${details.validationRuleName}" blocked the save`
+        : "Validation rule blocked the save";
+      return makeSimple("VALIDATION", "validation", "Validation Rule", h, details);
     }
 
     return makeSimple("UNKNOWN", "unknown", "Unknown Error", "Review debug logs for details.", details);
