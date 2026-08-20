@@ -7,7 +7,7 @@ import {
 import { BackgroundAssistantApi } from "../api/backgroundClient.js";
 import { MockAssistantApi } from "../api/assistantApi.js";
 import { analyzeRequirementLocally } from "../api/localAnalyze.js";
-import { DEFAULT_ICON_POSITION, STORAGE_KEYS } from "../config.js";
+import { DEFAULT_ICON_POSITION, STORAGE_KEYS, normalizeIconPosition } from "../config.js";
 import { CopilotApp, browserContext } from "../ui/App.js";
 import { COPILOT_CSS } from "../ui/styles.js";
 
@@ -28,18 +28,12 @@ function readStoredPosition(): Promise<typeof DEFAULT_ICON_POSITION> {
       return;
     }
     chrome.storage.local.get(STORAGE_KEYS.iconPosition, (value) => {
-      const stored = value[STORAGE_KEYS.iconPosition] as
-        | { bottom?: number; right?: number }
-        | undefined;
-      resolve({
-        bottom: stored?.bottom ?? DEFAULT_ICON_POSITION.bottom,
-        right: stored?.right ?? DEFAULT_ICON_POSITION.right
-      });
+      resolve(normalizeIconPosition(value[STORAGE_KEYS.iconPosition]));
     });
   });
 }
 
-function persistPosition(position: { bottom: number; right: number }) {
+function persistPosition(position: { top: number; right: number }) {
   if (typeof chrome === "undefined" || !chrome.storage?.local) {
     return;
   }

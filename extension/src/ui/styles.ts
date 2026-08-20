@@ -45,27 +45,55 @@ button, textarea {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 1px solid #0b5cab;
-  background: #0176d3;
-  color: #ffffff;
+  border: 1px solid #ffb347;
+  background: radial-gradient(circle at 28% 22%, #ffe566 0%, #ff7a00 36%, #ff2d00 70%, #7a0c00 100%);
+  color: #fff8e7;
   cursor: grab;
   display: grid;
   place-items: center;
-  box-shadow: 0 8px 20px rgba(1, 68, 134, 0.28);
+  box-shadow:
+    0 0 6px #ffd27a,
+    0 0 16px #ff6a00,
+    0 0 28px rgba(255, 40, 0, 0.75);
   z-index: 2;
 }
 
 .icon-button:hover,
 .icon-button:focus-visible {
-  background: #0b5cab;
-  outline: 3px solid #90d0fe;
+  background: radial-gradient(circle at 28% 22%, #fff1a8 0%, #ff9100 34%, #ff1f00 100%);
+  outline: 3px solid #ffb347;
   outline-offset: 2px;
+  box-shadow:
+    0 0 10px #ffe08a,
+    0 0 24px #ff4d00,
+    0 0 40px rgba(255, 32, 0, 0.9);
 }
 
 .icon-button[aria-pressed="true"],
 .icon-button:active {
-  background: #014486;
+  background: radial-gradient(circle at 28% 22%, #ffb347 0%, #e03600 68%, #4a0600 100%);
   cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .icon-button {
+    animation: lava-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes lava-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 6px #ffd27a,
+      0 0 16px #ff6a00,
+      0 0 28px rgba(255, 40, 0, 0.75);
+  }
+  50% {
+    box-shadow:
+      0 0 12px #ffe08a,
+      0 0 26px #ff3b00,
+      0 0 42px rgba(255, 16, 0, 0.95);
+  }
 }
 
 .icon-button svg {
@@ -290,7 +318,7 @@ button, textarea {
   .panel {
     width: calc(100vw - 16px);
     right: 8px !important;
-    bottom: 64px !important;
+    top: 64px !important;
   }
 }
 `;

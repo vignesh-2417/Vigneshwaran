@@ -3,15 +3,15 @@ import type { PointerEvent } from "react";
 
 interface FloatingIconProps {
   pressed: boolean;
-  bottom: number;
+  top: number;
   right: number;
   onToggle: () => void;
-  onPositionChange: (bottom: number, right: number) => void;
+  onPositionChange: (top: number, right: number) => void;
 }
 
 export function FloatingIcon({
   pressed,
-  bottom,
+  top,
   right,
   onToggle,
   onPositionChange
@@ -19,7 +19,7 @@ export function FloatingIcon({
   const drag = useRef<{
     startX: number;
     startY: number;
-    bottom: number;
+    top: number;
     right: number;
     moved: boolean;
   } | null>(null);
@@ -30,7 +30,7 @@ export function FloatingIcon({
     drag.current = {
       startX: event.clientX,
       startY: event.clientY,
-      bottom,
+      top,
       right,
       moved: false
     };
@@ -49,11 +49,11 @@ export function FloatingIcon({
         Math.max(8, current.right - deltaX),
         window.innerWidth - 56
       );
-      const nextBottom = Math.min(
-        Math.max(8, current.bottom - deltaY),
+      const nextTop = Math.min(
+        Math.max(8, current.top + deltaY),
         window.innerHeight - 56
       );
-      onPositionChange(nextBottom, nextRight);
+      onPositionChange(nextTop, nextRight);
     }
   };
 
@@ -80,7 +80,7 @@ export function FloatingIcon({
       aria-label="Salesforce Metadata Copilot"
       aria-pressed={pressed}
       aria-haspopup="dialog"
-      style={{ bottom: `${bottom}px`, right: `${right}px` }}
+      style={{ top: `${top}px`, right: `${right}px` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

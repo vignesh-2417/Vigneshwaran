@@ -5,7 +5,7 @@ import type { AssistantState } from "./assistantState.js";
 interface AssistantPanelProps {
   state: AssistantState;
   targetOrg: string;
-  bottom: number;
+  top: number;
   right: number;
   requirement: string;
   onRequirementChange: (value: string) => void;
@@ -19,7 +19,7 @@ interface AssistantPanelProps {
 export function AssistantPanel({
   state,
   targetOrg,
-  bottom,
+  top,
   right,
   requirement,
   onRequirementChange,
@@ -41,7 +41,7 @@ export function AssistantPanel({
       aria-modal="true"
       aria-labelledby="sfcopilot-title"
       data-minimized={state.minimized ? "true" : "false"}
-      style={{ bottom: `${bottom + 60}px`, right: `${right}px` }}
+      style={{ top: `${top + 60}px`, right: `${right}px` }}
     >
       <header className="panel-header">
         <h1 className="panel-title" id="sfcopilot-title">

@@ -41,8 +41,8 @@ export function CopilotApp({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state.open]);
 
-  const updatePosition = (bottom: number, right: number) => {
-    const next = { bottom, right };
+  const updatePosition = (top: number, right: number) => {
+    const next = { top, right };
     setPosition(next);
     onPositionChange?.(next);
   };
@@ -126,7 +126,7 @@ export function CopilotApp({
     <div className="copilot-root">
       <FloatingIcon
         pressed={state.open}
-        bottom={position.bottom}
+        top={position.top}
         right={position.right}
         onToggle={toggle}
         onPositionChange={updatePosition}
@@ -135,7 +135,7 @@ export function CopilotApp({
         <AssistantPanel
           state={state}
           targetOrg={context.hostname}
-          bottom={position.bottom}
+          top={position.top}
           right={position.right}
           requirement={requirement}
           onRequirementChange={setRequirement}
