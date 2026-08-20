@@ -40,7 +40,7 @@ The huge “error” dump that starts with `var uN=Object.defineProperty` is the
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.3** and click **Reload**
+2. On `chrome://extensions`, confirm version **0.1.4** and click **Reload**
 3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
@@ -48,7 +48,8 @@ Do not load a parent folder, zip, or a stale copy that still has `content.js` st
 ## Expected UI
 
 - Orange neon lava circle, top-right (below the Lightning header)
-- The login panel opens with the icon so you can sign in as the org user
+- A Salesforce username/password form appears next to the icon immediately
+- After sign-in, the task panel opens so you can run the prompt as that user
 - Username, password, and optional security token stay in `chrome.storage.session` only (not in git)
 - After sign-in, **Create in org** tries Tooling API custom-field create (example: Account.COP_Text__c)
 - Permission sets, profiles, sharing, and destructive changes stay blocked

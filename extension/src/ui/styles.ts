@@ -318,7 +318,7 @@ button, textarea {
 
 .login-card {
   pointer-events: auto;
-  margin: 12px 12px 0;
+  margin: 0;
   padding: 10px 12px;
   background: #ffffff;
   border: 1px solid #c9c9c9;
@@ -327,6 +327,13 @@ button, textarea {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
+}
+
+.login-float {
+  pointer-events: auto;
+  position: fixed;
+  width: min(340px, calc(100vw - 24px));
+  z-index: 5;
 }
 
 .login-card h3 {

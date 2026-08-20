@@ -9,7 +9,7 @@ interface AssistantPanelProps {
   right: number;
   requirement: string;
   authenticated: boolean;
-  loginSlot: ReactNode;
+  loginSlot?: ReactNode;
   onRequirementChange: (value: string) => void;
   onClose: () => void;
   onMinimize: () => void;
@@ -45,7 +45,7 @@ export function AssistantPanel({
       aria-modal="true"
       aria-labelledby="sfcopilot-title"
       data-minimized={state.minimized ? "true" : "false"}
-      style={{ top: `${top + 60}px`, right: `${right}px` }}
+      style={{ top: `${top}px`, right: `${right}px` }}
     >
       <header className="panel-header">
         <h1 className="panel-title" id="sfcopilot-title">

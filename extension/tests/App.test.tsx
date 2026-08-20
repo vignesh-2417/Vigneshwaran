@@ -46,16 +46,16 @@ describe("assistant panel", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("asks for Salesforce credentials when the panel opens", async () => {
+  it("asks for Salesforce credentials as soon as the lava icon appears", async () => {
     const user = userEvent.setup();
-    renderApp(new MockAssistantApi(analyzeRequirementLocally), true);
+    renderApp();
     expect(screen.getByLabelText("Salesforce username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Salesforce username"), "user@example.com");
     await user.type(screen.getByLabelText("Password"), "not-a-real-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText(/Logged in as/)).toBeInTheDocument();
-    expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Salesforce Metadata Copilot" })).toBeInTheDocument();
   });
 
   it("requires login before creating metadata", async () => {

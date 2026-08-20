@@ -159,6 +159,44 @@ export function CopilotApp({
     }
   };
 
+  const loginForm = (
+    <LoginForm
+      auth={auth}
+      loginHost={loginHost}
+      status={loginStatus}
+      errorMessage={loginError}
+      onLoginHostChange={setLoginHost}
+      onLogin={(input) => {
+        setLoginStatus("loading");
+        setLoginError(null);
+        void api
+          .login(input)
+          .then((next) => {
+            setAuth(next);
+            setLoginStatus("idle");
+            setState((current) => ({
+              ...current,
+              open: true,
+              messages: [
+                ...current.messages,
+                createMessage("system", `Signed in as ${next.username}. Submit a requirement to run it as this user.`)
+              ]
+            }));
+          })
+          .catch((error: unknown) => {
+            setLoginStatus("error");
+            setLoginError(error instanceof Error ? error.message : "Salesforce login failed.");
+          });
+      }}
+      onLogout={() => {
+        void api.logout().then(() => {
+          setAuth(ANONYMOUS);
+          setLoginError(null);
+        });
+      }}
+    />
+  );
+
   return (
     <div className="copilot-root">
       <FloatingIcon
@@ -168,52 +206,20 @@ export function CopilotApp({
         onToggle={toggle}
         onPositionChange={updatePosition}
       />
+      <div
+        className="login-float"
+        style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
+      >
+        {loginForm}
+      </div>
       {state.open ? (
         <AssistantPanel
           state={state}
           targetOrg={context.hostname}
-          top={position.top}
+          top={position.top + (auth.authenticated ? 168 : 312)}
           right={position.right}
           requirement={requirement}
           authenticated={auth.authenticated}
-          loginSlot={
-            <LoginForm
-              auth={auth}
-              loginHost={loginHost}
-              status={loginStatus}
-              errorMessage={loginError}
-              onLoginHostChange={setLoginHost}
-              onLogin={(input) => {
-                setLoginStatus("loading");
-                setLoginError(null);
-                void api
-                  .login(input)
-                  .then((next) => {
-                    setAuth(next);
-                    setLoginStatus("idle");
-                    setState((current) => ({
-                      ...current,
-                      messages: [
-                        ...current.messages,
-                        createMessage("system", `Signed in as ${next.username}.`)
-                      ]
-                    }));
-                  })
-                  .catch((error: unknown) => {
-                    setLoginStatus("error");
-                    setLoginError(
-                      error instanceof Error ? error.message : "Salesforce login failed."
-                    );
-                  });
-              }}
-              onLogout={() => {
-                void api.logout().then(() => {
-                  setAuth(ANONYMOUS);
-                  setLoginError(null);
-                });
-              }}
-            />
-          }
           onRequirementChange={setRequirement}
           onClose={close}
           onMinimize={() =>
