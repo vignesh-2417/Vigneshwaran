@@ -109,6 +109,34 @@ const HELP_ARTICLES = {
       "Use 'When no records are returned' output handling",
     ],
   },
+  FLOW_MALFORMED_ID: {
+    title: "Flow Failed — Invalid Lookup ID",
+    summary:
+      "A Flow assigned a non-ID value (e.g. text) to a lookup or master-detail field. Salesforce IDs must be 15 or 18 characters.",
+    url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5",
+    setupPath: "Setup → Flows → [Flow Name] → Update Records element",
+    quickChecks: [
+      "Debug the flow and inspect the value assigned to the lookup field",
+      "Ensure the variable holds a valid record ID from Get Records or a prior query",
+      "Add validation before Update Records to check ID format",
+    ],
+    secondaryArticle: {
+      title: "Data Types and IDs",
+      url: "https://help.salesforce.com/s/articleView?id=sf.overview_lookups.htm&type=5",
+    },
+  },
+  MALFORMED_ID: {
+    title: "Invalid Salesforce ID on Save",
+    summary:
+      "A field expecting a record ID received text or an incorrectly formatted value.",
+    url: "https://help.salesforce.com/s/articleView?id=sf.overview_lookups.htm&type=5",
+    setupPath: "Setup → Object Manager → Fields",
+    quickChecks: [
+      "Identify the lookup field mentioned in the error",
+      "Replace the invalid value with a valid 15/18-character Salesforce ID",
+      "Check automation (Flow/Apex) that populates the field",
+    ],
+  },
   APEX: {
     title: "Debug Apex & Triggers",
     summary:

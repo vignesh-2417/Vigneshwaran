@@ -13,18 +13,31 @@
 
   // Selectors that Lightning / Aura / LWC uses for error messages
   const ERROR_SELECTORS = [
+    // "We hit a snag" / record save errors (Lightning Experience)
+    "records-form-error-message",
+    "records-record-edit-errors",
+    "force-record-edit-errors",
+    "runtime_platform_actions-popover-error-panel",
+    "runtime_platform_actions-error-message",
+    "lightning-messages",
+    "lightning-message",
+    ".slds-popover__body",
+    ".slds-popover .slds-text-color_error",
+    ".slds-popover [role='alert']",
     // Aura / generic toast
     "[data-aura-class='forceActionsText']",
     ".forceActionsText",
     // LWC toast
     "lightning-base-toast .slds-notify__content",
     ".slds-notify--toast .slds-notify__content",
+    ".slds-notify--error .slds-notify__content",
     // Inline field errors
     ".slds-has-error .slds-form-element__help",
     // Page-level errors
     ".slds-page-header .slds-text-color_error",
     // Generic error containers
     "[role='alert']",
+    "[role='alertdialog']",
     ".errorMessage",
     ".slds-text-color_error",
     ".toastMessage",
@@ -36,6 +49,16 @@
     // Modal errors
     ".modal-error",
     "force-error-panel",
+    ".uiPanel .errorsList li",
+  ];
+
+  // Visible error anchors — used for full-page text fallback (catches LWC popovers)
+  const ERROR_ANCHORS = [
+    "We hit a snag",
+    "We can't save this record",
+    "Review the errors on this page",
+    "This error occurred:",
+    "Give your Salesforce admin these details",
   ];
 
   // Keywords that signal an actionable error (case-insensitive)
@@ -44,11 +67,16 @@
     "exception",
     "failed",
     "failure",
+    "we hit a snag",
+    "process failed",
+    "malformed_id",
+    "incorrect type",
     "insufficient access",
     "insufficient privileges",
     "validation",
     "unable to",
     "cannot",
+    "can't save",
     "required field",
     "field_custom_validation",
     "null pointer",
@@ -57,9 +85,11 @@
     "invalid cross reference",
     "apex trigger",
     "flow interview",
+    "the flow tried",
     "no access",
     "permission denied",
     "unauthorized",
+    "exceptioncode",
   ];
 
   // ─── State ─────────────────────────────────────────────────────────────────
@@ -146,7 +176,44 @@
   function isErrorText(text) {
     if (!text || text.length < 5) return false;
     const lower = text.toLowerCase();
-    return ERROR_KEYWORDS.some((kw) => lower.includes(kw));
+    return (
+      ERROR_KEYWORDS.some((kw) => lower.includes(kw)) ||
+      ERROR_ANCHORS.some((anchor) => text.includes(anchor))
+    );
+  }
+
+  /**
+   * Fallback: scan visible page text for Salesforce error anchors.
+   * Catches "We hit a snag" popovers that don't match element selectors.
+   */
+  function scanPageTextFallback() {
+    const bodyText = document.body?.innerText || "";
+    if (!bodyText) return null;
+
+    for (const anchor of ERROR_ANCHORS) {
+      const idx = bodyText.indexOf(anchor);
+      if (idx === -1) continue;
+
+      // Grab error block from anchor through admin details / error id
+      let end = bodyText.length;
+      const endMarkers = ["Error ID:", "Click here", "OK", "Close"];
+      for (const marker of endMarkers) {
+        const mIdx = bodyText.indexOf(marker, idx + anchor.length);
+        if (mIdx !== -1 && mIdx < end) end = mIdx + marker.length + 80;
+      }
+
+      const chunk = bodyText.slice(idx, Math.min(end, idx + 2500));
+      const normalized = chunk.replace(/\s+/g, " ").trim();
+      if (normalized.length >= 20) return normalized;
+    }
+
+    // MALFORMED_ID without anchor (rare)
+    if (/MALFORMED_ID/i.test(bodyText)) {
+      const m = bodyText.match(/(.{0,120}MALFORMED_ID.{0,400})/i);
+      if (m) return m[1].replace(/\s+/g, " ").trim();
+    }
+
+    return null;
   }
 
   // ─── DOM Scan ─────────────────────────────────────────────────────────────
@@ -167,9 +234,12 @@
       }
     }
 
-    // Deduplicate
-    const unique = [...new Set(found)];
-    return unique.join(" | ") || null;
+    const fallback = scanPageTextFallback();
+    if (fallback) found.push(fallback);
+
+    // Deduplicate — keep longest message (most detail)
+    const unique = [...new Set(found)].sort((a, b) => b.length - a.length);
+    return unique[0] || null;
   }
 
   // ─── In-page Help Banner ───────────────────────────────────────────────────
@@ -389,7 +459,19 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === "REQUEST_CURRENT_ERROR") {
       const errorText = scanForErrors();
-      sendResponse({ errorText, url: window.location.href });
+      const { object, recordId, context } = parseUrl(window.location.href);
+      sendResponse({
+        errorText,
+        url: window.location.href,
+        object,
+        recordId,
+        context,
+      });
+      // If popup triggered scan and we found an error, report it
+      if (msg.triggerAnalysis && errorText) {
+        reportError(errorText);
+      }
+      return true;
     }
   });
 

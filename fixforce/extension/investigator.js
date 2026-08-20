@@ -6,10 +6,25 @@
   "use strict";
 
   const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i];
-  const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i];
+  const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i, /process failed/i, /we can't save this record/i, /the flow tried to update/i];
   const VALIDATION_SIGNALS = [/FIELD_CUSTOM_VALIDATION_EXCEPTION/i, /validation rule/i, /validation failed/i];
 
   const COMPOSITE_SCENARIOS = [
+    {
+      id: "FLOW_MALFORMED_ID",
+      category: "FLOW",
+      failureType: "flow_malformed_id",
+      label: "Flow Failed — Invalid ID Value",
+      helpArticleKey: "FLOW_MALFORMED_ID",
+      requires: (s) => s.hasFlow && s.hasMalformedId,
+      headline: (d) => `Flow "${d.flowName || "Unknown"}" failed — invalid ID in "${d.fieldName || "lookup field"}"`,
+      narrative: (d) => `Process/Flow "${d.flowName || "unknown"}" tried to set an invalid Salesforce ID${d.invalidValue ? ` ("${d.invalidValue}")` : ""} on ${d.fieldName || "a lookup field"}. IDs must be 15/18 characters.`,
+      quickChecks: (d) => [
+        d.flowName ? `Setup → Flows → "${d.flowName}" → Debug` : "Find the failing flow in Setup → Flows",
+        d.fieldName ? `Check value assigned to "${d.fieldName}"` : "Inspect lookup field assignments",
+        "Use a valid record ID from Get Records, not free text",
+      ],
+    },
     {
       id: "FLOW_PERMISSION",
       category: "FLOW",
@@ -77,6 +92,7 @@
     FLOW_REQUIRED_FIELD: { title: "Flow — Required Field Missing", summary: "Flow did not set a required field.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_ref_elements_create.htm&type=5", setupPath: "Setup → Flows" },
     APEX_PERMISSION: { title: "Apex DML Permission Denied", summary: "Apex lacked permissions for DML.", url: "https://help.salesforce.com/s/articleView?id=sf.apex_sharing.htm&type=5", setupPath: "Setup → Apex + Profiles" },
     FLOW: { title: "Troubleshoot Flow Errors", summary: "Flow runtime failure.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
+    FLOW_MALFORMED_ID: { title: "Flow Failed — Invalid Lookup ID", summary: "Flow assigned invalid text to a lookup field.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
     PERMISSION: { title: "User Permissions", summary: "Access denied.", url: "https://help.salesforce.com/s/articleView?id=sf.admin_userperms.htm&type=5", setupPath: "Setup → Users" },
     VALIDATION: { title: "Validation Rules", summary: "Validation blocked save.", url: "https://help.salesforce.com/s/articleView?id=sf.customize_validations.htm&type=5", setupPath: "Setup → Validation Rules" },
     INTEGRATION: { title: "HTTP Callouts", summary: "External callout failed.", url: "https://help.salesforce.com/s/articleView?id=sf.http_callouts.htm&type=5", setupPath: "Setup → Named Credentials" },
@@ -94,9 +110,10 @@
 
   function extractDetails(text, objectHint) {
     return {
-      flowName: firstMatch(text, [/flow\s+["']([^"']+)["']/i, /The flow\s+["']([^"']+)["']/i, /interview for\s+["']?([A-Za-z0-9_]+)/i]),
+      flowName: firstMatch(text, [/['']([^'']+)['']\s+process\s+failed/i, /because the\s+['']([^'']+)['']\s+process/i, /flow\s+["']([^"']+)["']/i]),
       flowElement: firstMatch(text, [/element\s+["']([^"']+)["']/i, /at element\s+["']?([A-Za-z0-9_]+)/i]),
-      fieldName: firstMatch(text, [/field[s]?\s+["']([^"']+)["']/i, /\[([A-Za-z0-9_]+)\]/]),
+      fieldName: firstMatch(text, [/MALFORMED_ID:\s*([^:]+?):\s*id value/i, /field[s]?\s+["']([^"']+)["']/i]),
+      invalidValue: firstMatch(text, [/id value of incorrect type:\s*(\S+)/i]),
       apexClass: firstMatch(text, [/Class\.([A-Za-z0-9_]+)/, /Trigger\.([A-Za-z0-9_]+)/]),
       objectName: firstMatch(text, [/object\s+["']([^"']+)["']/i]) || objectHint || null,
     };
@@ -111,6 +128,7 @@
       hasValidation: has(VALIDATION_SIGNALS),
       hasRequiredField: /required field|REQUIRED_FIELD_MISSING/i.test(text),
       hasApex: /apex|trigger|DMLException/i.test(text),
+      hasMalformedId: /MALFORMED_ID|id value of incorrect type/i.test(text),
       hasIntegration: /callout|http request|named credential/i.test(text),
       hasApproval: /approval process|submit for approval/i.test(text),
     };

@@ -166,6 +166,7 @@ function renderInvestigation(data) {
   if (inv.flowElement) items.push({ icon: "📍", label: inv.flowElement });
   if (inv.fieldName) items.push({ icon: "📝", label: inv.fieldName });
   if (inv.objectName) items.push({ icon: "📦", label: inv.objectName });
+  if (inv.invalidValue) items.push({ icon: "⚠️", label: `"${inv.invalidValue}"` });
   if (inv.apexClass) items.push({ icon: "⚙️", label: inv.apexClass });
   items.forEach(({ icon, label, accent }) => {
     const pill = document.createElement("span");
@@ -323,7 +324,34 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+function scanActiveTabOnOpen() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]?.id) return;
+    chrome.tabs.sendMessage(
+      tabs[0].id,
+      { type: "REQUEST_CURRENT_ERROR", triggerAnalysis: true },
+      (res) => {
+        if (chrome.runtime.lastError || !res?.errorText) return;
+        chrome.runtime.sendMessage({
+          type: "NEW_ERROR_DETECTED",
+          data: {
+            errorText: res.errorText,
+            url: res.url,
+            object: res.object || "Unknown",
+            recordId: res.recordId,
+            context: res.context || "record_page",
+            timestamp: new Date().toISOString(),
+          },
+        });
+        showOnly($loading);
+        setStatus("loading", "Analyzing detected error…");
+      }
+    );
+  });
+}
+
 loadState();
+scanActiveTabOnOpen();
 
 // Poll every 2 s while popup is open to catch updates
 const pollInterval = setInterval(loadState, 2000);

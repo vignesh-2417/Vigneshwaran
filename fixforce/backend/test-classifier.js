@@ -7,7 +7,13 @@ const { buildFallbackResponse } = require("./ai");
 
 const cases = [
   {
-    name: "Flow + Permission (user lacks field access)",
+    name: "Flow + MALFORMED_ID (test-nex / D&B Company)",
+    text: "We hit a snag. We can't save this record because the 'test-nex' process failed. The flow tried to update these records: 0015g00000Hvs8xAAB. This error occurred: MALFORMED_ID: D&B Company ID: id value of incorrect type: hihih.",
+    context: "record_page",
+    expectScenario: "FLOW_MALFORMED_ID",
+    expectFlow: "test-nex",
+  },
+  {
     text: 'The flow "Update_Account_Status" failed. An error occurred at element "Update_Records_1". INSUFFICIENT_ACCESS: insufficient privileges on cross-reference entity. Field "Status__c"',
     context: "record_page",
     expectScenario: "FLOW_PERMISSION",

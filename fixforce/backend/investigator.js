@@ -33,7 +33,9 @@ const FLOW_SIGNALS = [
   /autolaunched flow/i,
   /screen flow/i,
   /we can't save this record because the .?flow.? failed/i,
+  /we can't save this record because the/i,
   /process failed/i,
+  /the flow tried to update/i,
 ];
 
 const VALIDATION_SIGNALS = [
@@ -44,6 +46,27 @@ const VALIDATION_SIGNALS = [
 ];
 
 const COMPOSITE_SCENARIOS = [
+  {
+    id: "FLOW_MALFORMED_ID",
+    category: "FLOW",
+    failureType: "flow_malformed_id",
+    label: "Flow Failed — Invalid ID Value",
+    failureLayer: "flow",
+    rootCauseHint: "malformed_id_in_flow",
+    requires: (s) => s.hasFlow && s.hasMalformedId,
+    headline: (d) =>
+      `Flow "${d.flowName || "Unknown"}" failed — invalid ID in ${d.fieldName ? `"${d.fieldName}"` : "a lookup field"}`,
+    narrative: (d) =>
+      `The Flow${d.flowName ? ` ("${d.flowName}")` : ""} tried to update a record but assigned an invalid Salesforce ID${d.fieldName ? ` to "${d.fieldName}"` : ""}${d.invalidValue ? ` (value: "${d.invalidValue}" — must be a 15/18-character ID)` : ""}. Lookup and master-detail fields require valid record IDs, not free text.`,
+    quickChecks: (d) => [
+      d.flowName ? `Setup → Flows → "${d.flowName}" → Debug and inspect the Update Records element` : "Identify the failing flow/process from Setup → Flows",
+      d.fieldName ? `Check what value is assigned to "${d.fieldName}" before the DML step` : "Find which lookup field received a non-ID value",
+      "Ensure Assignment/Get Records outputs a valid 15 or 18-character Salesforce ID",
+      d.invalidValue ? `Replace "${d.invalidValue}" with a valid record ID or clear the field if optional` : "Validate ID format: starts with key prefix (e.g. 001 for Account)",
+      "Add a Decision to verify the ID is valid before Update Records",
+    ],
+    helpArticleKey: "FLOW_MALFORMED_ID",
+  },
   {
     id: "FLOW_PERMISSION",
     category: "FLOW",
@@ -154,9 +177,11 @@ const COMPOSITE_SCENARIOS = [
 
 const EXTRACTION_PATTERNS = {
   flowName: [
+    /['']([^'']+)['']\s+process\s+failed/i,
+    /because the\s+['']([^'']+)['']\s+process/i,
     /(?:the flow|flow)\s+["']([^"']+)["']/i,
     /flow\s+["']([^"']+)["']\s+failed/i,
-    /interview\s+(?:for|of)\s+["']?([A-Za-z0-9_]+)/i,
+    /interview\s+(?:for|of)\s+["']?([A-Za-z0-9_-]+)/i,
     /Flow:\s*([A-Za-z0-9_]+)/i,
     /process\s+["']([^"']+)["']/i,
     /fault occurred in\s+["']?([A-Za-z0-9_]+)/i,
@@ -168,10 +193,15 @@ const EXTRACTION_PATTERNS = {
     /FLOW_ELEMENT[_\s]+([A-Za-z0-9_]+)/i,
   ],
   fieldName: [
+    /MALFORMED_ID:\s*([^:]+?):\s*id value/i,
     /field[s]?\s+["']([^"']+)["']/i,
     /fields?:\s*([A-Za-z0-9_,\s__]+?)(?:\.|$|\s+are|\s+is)/i,
     /\[([A-Za-z0-9_]+)\]/,
     /column\s+["']?([A-Za-z0-9_]+)/i,
+  ],
+  invalidValue: [
+    /id value of incorrect type:\s*(\S+)/i,
+    /incorrect type:\s*([^\s.]+)/i,
   ],
   apexClass: [
     /Class\.([A-Za-z0-9_]+)/,
@@ -212,6 +242,7 @@ function detectSignals(text) {
     hasGovernor: /governor limit|too many SOQL|CPU time limit/i.test(text),
     hasCpq: /SBQQ|CPQ|steelbrick/i.test(text),
     hasLock: /unable to lock|record is locked/i.test(text),
+    hasMalformedId: /MALFORMED_ID|malformed_id|id value of incorrect type|incorrect type/i.test(text),
   };
 }
 
@@ -220,7 +251,8 @@ function extractDetails(errorText, objectHint) {
   return {
     flowName: firstMatch(text, EXTRACTION_PATTERNS.flowName),
     flowElement: firstMatch(text, EXTRACTION_PATTERNS.flowElement),
-    fieldName: firstMatch(text, EXTRACTION_PATTERNS.fieldName),
+    fieldName: firstMatch(text, EXTRACTION_PATTERNS.fieldName)?.trim(),
+    invalidValue: firstMatch(text, EXTRACTION_PATTERNS.invalidValue),
     apexClass: firstMatch(text, EXTRACTION_PATTERNS.apexClass),
     objectName: firstMatch(text, EXTRACTION_PATTERNS.objectName) || objectHint || null,
   };
@@ -337,6 +369,19 @@ function buildSingleCategoryInvestigation(signals, details, context) {
     narrative = `The flow "${details.flowName}"${details.flowElement ? ` failed at element "${details.flowElement}"` : ""}. Use Flow Debug to trace the exact step.`;
     helpArticleKey = "FLOW";
     failureLayer = "flow";
+  } else if (signals.hasFlow && signals.hasMalformedId) {
+    headline = `Flow failed — invalid ID value${details.fieldName ? ` on "${details.fieldName}"` : ""}`;
+    narrative = `A Flow/process tried to save an invalid Salesforce ID${details.invalidValue ? ` ("${details.invalidValue}")` : ""} into a lookup field.`;
+    helpArticleKey = "FLOW_MALFORMED_ID";
+    failureLayer = "flow";
+  } else if (signals.hasMalformedId) {
+    classification.category = "DATA";
+    classification.failureType = "malformed_id";
+    classification.label = "Invalid ID Value";
+    headline = `Invalid Salesforce ID${details.fieldName ? ` on field "${details.fieldName}"` : ""}`;
+    narrative = `A lookup or ID field received a value that is not a valid 15/18-character Salesforce record ID.`;
+    helpArticleKey = "MALFORMED_ID";
+    failureLayer = "data";
   }
 
   const investigation = {
