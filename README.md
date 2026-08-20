@@ -16,7 +16,7 @@ npm install
 npm run build -w extension
 ```
 
-That produces `extension/dist/content.js` and `extension/dist/background.js`, copies `process-shim.js` next to them, and writes `extension/dist/manifest.json`. The content bundle is verified to start with `var process={env:{NODE_ENV:` and not contain `react.development.js`.
+That produces `extension/dist/content.js` and `extension/dist/background.js`, copies `process-shim.js` next to them, and writes `extension/dist/manifest.json`. The content bundle is verified to start with `/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:` and not contain `react.development.js`.
 
 ## Load unpacked in Chrome
 
@@ -31,22 +31,22 @@ From **`extension`**, Chrome injects `process-shim.js` then `dist/content.js`. F
 
 ### If you still see no icon
 
-The huge “error” dump that starts with `var uN=Object.defineProperty` is the **old crashing bundle** (React production + development, leftover `process.env.NODE_ENV`). A good build starts with:
+The huge “error” dump that starts with `var uN=Object.defineProperty` is the **old crashing bundle** (React production + development, leftover `process.env.NODE_ENV`). Search `content.js` for `SF_METADATA_COPILOT_CONTENT_V2`. A good build starts with:
 
 ```text
-var process={env:{NODE_ENV:"production"}};var Uh=Object.defineProperty
+/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:"production"}};
 ```
 
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. Click **Reload** on the extension card (do not skip this)
-3. Hard-refresh Lightning
+2. On `chrome://extensions`, confirm version **0.1.1** and click **Reload**
+3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
 
 ## Expected UI
 
-- Orange neon lava circle, top-right
+- Orange neon lava circle, top-right (below the Lightning header)
 - Click to open the panel
 - Submit needs the backend on port 8787 when using the background API

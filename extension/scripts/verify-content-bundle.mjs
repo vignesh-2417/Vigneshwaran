@@ -15,8 +15,8 @@ if (!existsSync(shim)) {
 const source = readFileSync(bundle, "utf8");
 const failures = [];
 
-if (!source.startsWith('var process={env:{NODE_ENV:')) {
-  failures.push("content.js must start with a process.env shim so Lightning pages do not crash");
+if (!source.startsWith('/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:')) {
+  failures.push("content.js is missing the SF_METADATA_COPILOT_CONTENT_V2 process shim");
 }
 
 if (source.includes("react.development.js")) {

@@ -20,7 +20,7 @@ export const COPILOT_CSS = `
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 2147483000;
+  z-index: 2147483647;
   font-family: "Salesforce Sans", "Segoe UI", system-ui, sans-serif;
 }
 
@@ -42,8 +42,10 @@ button, textarea {
 .icon-button {
   pointer-events: auto;
   position: fixed;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
+  font-size: 16px;
+  font-weight: 700;
   border-radius: 50%;
   border: 1px solid #ffb347;
   background: radial-gradient(circle at 28% 22%, #ffe566 0%, #ff7a00 36%, #ff2d00 70%, #7a0c00 100%);

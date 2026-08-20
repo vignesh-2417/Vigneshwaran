@@ -12,6 +12,7 @@ import { CopilotApp, browserContext } from "../ui/App.js";
 import { COPILOT_CSS } from "../ui/styles.js";
 
 const roots = new WeakMap<Element, Root>();
+let hostObserver: MutationObserver | null = null;
 
 function isTopWindow(): boolean {
   try {
@@ -40,6 +41,20 @@ function persistPosition(position: { top: number; right: number }) {
   void chrome.storage.local.set({ [STORAGE_KEYS.iconPosition]: position });
 }
 
+function mountNativeFallback(doc: Document, shadow: ShadowRoot, position: typeof DEFAULT_ICON_POSITION) {
+  if (shadow.querySelector("button[aria-label='Salesforce Metadata Copilot']")) {
+    return;
+  }
+  const button = doc.createElement("button");
+  button.type = "button";
+  button.className = "icon-button";
+  button.setAttribute("aria-label", "Salesforce Metadata Copilot");
+  button.style.top = `${position.top}px`;
+  button.style.right = `${position.right}px`;
+  button.textContent = "SF";
+  shadow.append(button);
+}
+
 export interface InjectOptions {
   hostname?: string;
   isTop?: boolean;
@@ -64,12 +79,10 @@ export async function injectAssistant(
   const host = doc.createElement("div");
   host.id = HOST_ELEMENT_ID;
   host.setAttribute("data-sf-metadata-copilot", "true");
-  host.style.all = "initial";
-  host.style.position = "fixed";
-  host.style.inset = "0";
-  host.style.pointerEvents = "none";
-  host.style.zIndex = "2147483000";
-  doc.documentElement.appendChild(host);
+  host.setAttribute("data-sf-metadata-copilot-version", "v2");
+  host.style.cssText =
+    "all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647;";
+  (doc.body ?? doc.documentElement).appendChild(host);
 
   const shadow = host.attachShadow({ mode: "open" });
   const style = doc.createElement("style");
@@ -86,29 +99,45 @@ export async function injectAssistant(
     ? new BackgroundAssistantApi()
     : new MockAssistantApi(analyzeRequirementLocally);
 
-  const root = createRoot(mount);
-  roots.set(host, root);
-  root.render(
-    createElement(
-      StrictMode,
-      null,
-      createElement(CopilotApp, {
-        api,
-        getContext: browserContext,
-        initialPosition: position,
-        onPositionChange: persistPosition
-      })
-    )
-  );
+  try {
+    const root = createRoot(mount);
+    roots.set(host, root);
+    root.render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(CopilotApp, {
+          api,
+          getContext: browserContext,
+          initialPosition: position,
+          onPositionChange: persistPosition
+        })
+      )
+    );
+  } catch {
+    mountNativeFallback(doc, shadow, position);
+  }
 }
 
 export function removeAssistant(doc: Document = document): void {
+  hostObserver?.disconnect();
+  hostObserver = null;
   const host = doc.getElementById(HOST_ELEMENT_ID);
   if (!host) {
     return;
   }
   roots.get(host)?.unmount();
   host.remove();
+}
+
+function watchHostPresence(doc: Document): void {
+  hostObserver?.disconnect();
+  hostObserver = new MutationObserver(() => {
+    if (!doc.getElementById(HOST_ELEMENT_ID)) {
+      void injectAssistant(doc, { hostname: window.location.hostname });
+    }
+  });
+  hostObserver.observe(doc.documentElement, { childList: true, subtree: true });
 }
 
 let lastHref = "";
@@ -126,9 +155,17 @@ export function watchLightningNavigation(doc: Document = document): void {
   window.addEventListener("popstate", sync);
   window.addEventListener("hashchange", sync);
   window.setInterval(sync, 1000);
+  watchHostPresence(doc);
 }
 
 export function bootstrap(): void {
-  void injectAssistant();
-  watchLightningNavigation();
+  const run = () => {
+    void injectAssistant();
+    watchLightningNavigation();
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, { once: true });
+  } else {
+    run();
+  }
 }

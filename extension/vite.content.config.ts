@@ -2,7 +2,8 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
-const PROCESS_SHIM = 'var process={env:{NODE_ENV:"production"}};';
+const PROCESS_SHIM =
+  '/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:"production"}};';
 
 function prependProcessShim(): Plugin {
   return {

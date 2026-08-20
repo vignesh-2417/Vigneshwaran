@@ -10,8 +10,8 @@ export interface IconPosition {
 }
 
 export const DEFAULT_ICON_POSITION: IconPosition = {
-  top: 16,
-  right: 16
+  top: 72,
+  right: 20
 };
 
 export function normalizeIconPosition(stored: unknown): IconPosition {
