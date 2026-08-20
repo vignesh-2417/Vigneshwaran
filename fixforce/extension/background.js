@@ -1,13 +1,10 @@
 /**
- * FixForce – background.js (Service Worker, MV3)
- * Handles API calls to backend, stores results in chrome.storage,
- * and manages badge state.
+ * FixForce – background.js
  */
 
-const API_BASE_URL = "http://localhost:3000"; // Change to your deployed backend URL
+const API_BASE_URL = "http://localhost:3000";
 const MAX_HISTORY_ITEMS = 50;
 
-// ─── Badge Helpers ────────────────────────────────────────────────────────────
 function setBadgeError() {
   chrome.action.setBadgeText({ text: "!" });
   chrome.action.setBadgeBackgroundColor({ color: "#E53935" });
@@ -22,7 +19,6 @@ function setBadgeClear() {
   chrome.action.setBadgeText({ text: "" });
 }
 
-// ─── API Call ─────────────────────────────────────────────────────────────────
 async function callAnalyzeAPI(errorData) {
   const response = await fetch(`${API_BASE_URL}/analyze-error`, {
     method: "POST",
@@ -35,16 +31,34 @@ async function callAnalyzeAPI(errorData) {
       recordId: errorData.recordId,
     }),
   });
-
   if (!response.ok) {
     const errBody = await response.text();
     throw new Error(`API error ${response.status}: ${errBody}`);
   }
-
   return response.json();
 }
 
-// ─── Storage Helpers ──────────────────────────────────────────────────────────
+function buildItemFromLocal(errorData) {
+  const la = errorData.localAnalysis || {};
+  return {
+    id: crypto.randomUUID(),
+    timestamp: errorData.timestamp || new Date().toISOString(),
+    errorText: errorData.errorText,
+    object: errorData.object,
+    context: errorData.context,
+    url: errorData.url,
+    category: la.category || "UNKNOWN",
+    failureLabel: la.failureLabel || "Salesforce Error",
+    failureType: la.failureType || "unknown",
+    rootCause: la.rootCause || la.investigation?.narrative || "Error detected locally.",
+    fixSteps: la.fixSteps || [],
+    confidence: la.confidence || 0.7,
+    investigation: la.investigation,
+    helpArticle: la.helpArticle,
+    offline: true,
+  };
+}
+
 async function saveAnalysis(errorData, analysis) {
   const item = {
     id: crypto.randomUUID(),
@@ -63,54 +77,41 @@ async function saveAnalysis(errorData, analysis) {
     errorHistory: updated,
     latestAnalysis: item,
     lastUpdated: Date.now(),
+    isLoading: false,
+    apiError: null,
   });
 
   return item;
 }
 
-async function setLoadingState(isLoading) {
-  await chrome.storage.local.set({ isLoading });
-}
-
-async function setErrorState(errorMsg) {
-  await chrome.storage.local.set({ isLoading: false, apiError: errorMsg });
-}
-
-// ─── Main Handler ─────────────────────────────────────────────────────────────
 async function handleNewError(errorData) {
+  const localItem = buildItemFromLocal(errorData);
+
+  // Save local analysis immediately so popup works without backend
+  await chrome.storage.local.set({
+    latestAnalysis: localItem,
+    isLoading: true,
+    apiError: null,
+    latestErrorContext: {
+      errorText: errorData.errorText,
+      context: errorData.context,
+      object: errorData.object,
+    },
+  });
+  setBadgeError();
+
   try {
     setBadgeLoading();
-    await setLoadingState(true);
-    await chrome.storage.local.set({
-      apiError: null,
-      latestErrorContext: {
-        errorText: errorData.errorText,
-        context: errorData.context,
-        object: errorData.object,
-      },
-    });
-
     const analysis = await callAnalyzeAPI(errorData);
     const saved = await saveAnalysis(errorData, analysis);
-
-    setBadgeError();
-    await chrome.storage.local.set({ isLoading: false, latestAnalysis: saved });
-
-    // Notify popup if open
-    chrome.runtime.sendMessage({
-      type: "ANALYSIS_COMPLETE",
-      data: saved,
-    }).catch(() => {
-      // Popup may not be open – ignore
-    });
+    chrome.runtime.sendMessage({ type: "ANALYSIS_COMPLETE", data: saved }).catch(() => {});
   } catch (err) {
-    console.error("[FixForce] Analysis failed:", err);
-    setBadgeError();
-    await setErrorState(err.message || "Failed to analyze error");
+    console.warn("[FixForce] API unavailable, using local analysis:", err.message);
+    await saveAnalysis(errorData, localItem);
+    chrome.runtime.sendMessage({ type: "ANALYSIS_COMPLETE", data: localItem }).catch(() => {});
   }
 }
 
-// ─── Message Listener ─────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "NEW_ERROR_DETECTED") {
     handleNewError(msg.data);
@@ -134,7 +135,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       ["latestAnalysis", "isLoading", "apiError"],
       (data) => sendResponse(data)
     );
-    return true; // async
+    return true;
   }
 
   if (msg.type === "GET_HISTORY") {
@@ -145,12 +146,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
-// ─── Tab update: clear badge when navigating away from SF ────────────────────
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "loading" && tab.url) {
-    const isSalesforce =
-      tab.url.includes("salesforce.com") || tab.url.includes("force.com");
-    if (!isSalesforce) setBadgeClear();
+  if (changeInfo.status === "complete" && tab.url?.includes("force.com")) {
+    chrome.tabs.sendMessage(tabId, { type: "FORCE_SCAN" }).catch(() => {});
   }
 });
 

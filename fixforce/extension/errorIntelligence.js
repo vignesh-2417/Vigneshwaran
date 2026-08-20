@@ -1,6 +1,5 @@
 /**
  * FixForce – errorIntelligence.js
- * Delegates to investigator for deep local analysis.
  */
 (function (global) {
   "use strict";
@@ -15,9 +14,13 @@
       };
     }
     return {
-      classification: { category: "UNKNOWN", label: "Unknown", confidence: 0.3 },
-      helpArticle: { title: "Debug Logs", url: "https://help.salesforce.com/" },
-      investigation: null,
+      classification: { category: "UNKNOWN", label: "Salesforce Error", confidence: 0.5 },
+      helpArticle: {
+        title: "Troubleshoot Salesforce Errors",
+        summary: "Review the error message and check Setup → Debug Logs.",
+        url: "https://help.salesforce.com/s/articleView?id=sf.code_debug_log.htm&type=5",
+      },
+      investigation: { headline: "Salesforce error detected", narrative: errorText?.slice(0, 300) },
     };
   }
 
