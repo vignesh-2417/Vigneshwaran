@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Salesforce Metadata Copilot",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Floating assistant for Salesforce metadata requirements on Lightning pages.",
   "minimum_chrome_version": "114",
   "background": {
@@ -31,7 +31,9 @@
     "https://login.salesforce.com/*",
     "https://test.salesforce.com/*",
     "https://*.salesforce.com/*",
-    "https://*.my.salesforce.com/*"
+    "https://*.my.salesforce.com/*",
+    "https://fonts.googleapis.com/*",
+    "https://fonts.gstatic.com/*"
   ],
   "action": {
     "default_title": "Salesforce Metadata Copilot"

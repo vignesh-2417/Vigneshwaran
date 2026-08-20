@@ -100,8 +100,8 @@ describe("assistant panel", () => {
       screen.getByLabelText("Salesforce requirement"),
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
-    await user.click(screen.getByRole("button", { name: "Create in org" }));
-    expect(screen.getByRole("status")).toHaveTextContent(/Processing prompt/);
+    await user.click(screen.getByRole("button", { name: "Run ANALYZE" }));
+    expect(screen.getByRole("status")).toHaveTextContent(/Processing ANALYZE/);
     release();
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
   });
@@ -120,7 +120,7 @@ describe("assistant panel", () => {
     await signIn(user);
     await user.click(screen.getByRole("checkbox"));
     await user.type(screen.getByLabelText("Salesforce requirement"), "Create a Customer Tier field");
-    await user.click(screen.getByRole("button", { name: "Create in org" }));
+    await user.click(screen.getByRole("button", { name: "Run ANALYZE" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Mock backend unavailable");
   });
 
@@ -134,14 +134,15 @@ describe("assistant panel", () => {
       screen.getByLabelText("Salesforce requirement"),
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
-    await user.click(screen.getByRole("button", { name: "Create in org" }));
+    await user.click(screen.getByRole("button", { name: "Run ANALYZE" }));
     expect(await screen.findByRole("region", { name: "Current prompt" })).toHaveTextContent(
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
+    expect(await screen.findByRole("region", { name: "Required output" })).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Implementation plan" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Metadata diff" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Validation results" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve validation or deploy" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve plan" })).toBeEnabled();
   });
 
   it("supports keyboard activation of the floating icon", async () => {

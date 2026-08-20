@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AnalyzeRequestSchema,
+  buildBlockedAnalyzeResponse,
   buildMockCustomFieldPlan,
   detectBlockedOperations,
   minimizeSalesforceContext,
@@ -112,19 +113,7 @@ export async function handleAnalyze(
   if (blocked.length > 0) {
     return {
       status: 200,
-      body: {
-        ok: true,
-        correlationId,
-        blockedOperations: blocked,
-        clarifyingQuestions: [],
-        structuredRequirement: null,
-        implementationPlan: [],
-        metadataArtifacts: [],
-        validation: { status: "not_run", issues: [] },
-        deploymentStatus: "blocked",
-        warning:
-          "Blocked Salesforce operation. Analysis will not generate a deployment command or modify the org."
-      }
+      body: buildBlockedAnalyzeResponse(correlationId, blocked)
     };
   }
 

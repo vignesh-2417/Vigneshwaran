@@ -24,11 +24,13 @@ describe("buildMockCustomFieldPlan", () => {
       "11111111-1111-4111-8111-111111111111"
     );
     expect(plan.ok).toBe(true);
-    expect(plan.deploymentStatus).toBe("not_requested");
+    expect(plan.deploymentStatus).toBe("awaiting_approval");
+    expect(plan.operatingMode).toBe("REVIEW");
+    expect(plan.taskReport?.filesCreatedOrChanged[0]).toContain("COP_Text__c");
     expect(plan.structuredRequirement?.objectApiName).toBe("Account");
     expect(plan.metadataArtifacts[0]?.after).toContain("COP_Text__c");
     expect(plan.metadataArtifacts[0]?.after).toContain("<type>Text</type>");
-    expect(JSON.stringify(plan)).not.toMatch(/sf project deploy|sfdx force:source:deploy/i);
-    expect(plan.warning).toMatch(/org was not modified/i);
+    expect(JSON.stringify(plan)).not.toMatch(/sfdx force:source:deploy/i);
+    expect(plan.warning).toMatch(/never automatic/i);
   });
 });

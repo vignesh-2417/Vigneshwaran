@@ -1,4 +1,8 @@
-import { PRODUCT_NAME, type AnalyzeSuccessResponse } from "@sfcopilot/shared";
+import {
+  OPERATING_MODES,
+  PRODUCT_NAME,
+  type AnalyzeSuccessResponse
+} from "@sfcopilot/shared";
 import type { FormEvent, ReactNode } from "react";
 import type { AssistantState } from "./assistantState.js";
 
@@ -16,6 +20,7 @@ interface AssistantPanelProps {
   onMinimize: () => void;
   onReset: () => void;
   onSubmit: () => void;
+  onApprovePlan: () => void;
   onConsentChange: (value: boolean) => void;
 }
 
@@ -33,16 +38,23 @@ export function AssistantPanel({
   onMinimize,
   onReset,
   onSubmit,
+  onApprovePlan,
   onConsentChange
 }: AssistantPanelProps) {
   const onFormSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSubmit();
   };
+  const canApprove =
+    Boolean(state.analysis) &&
+    state.analysis?.blockedOperations.length === 0 &&
+    state.analysis?.clarifyingQuestions.length === 0 &&
+    state.analysis?.operatingMode === "REVIEW" &&
+    !state.planApproved;
 
   return (
     <section
-      className="panel"
+      className="panel panel-wide"
       role="dialog"
       aria-modal="true"
       aria-labelledby="sfcopilot-title"
@@ -74,10 +86,21 @@ export function AssistantPanel({
       {!state.minimized ? (
         <div className="panel-body">
           <div className="privacy-banner" role="note">
-            {authenticated
-              ? "Signed-in requests try to create allowed custom fields in this org via the Tooling API. Permission sets, profiles, sharing, credentials, and destructive changes stay blocked."
-              : "Sign in first. Until you do, Submit returns a mock plan only and does not create fields in Salesforce."}
+            Correctness, security, explainability, and reviewability come before speed. Permission
+            sets, profiles, sharing, login settings, credentials, production data, destructive
+            changes, and unreviewed Apex callouts are never applied automatically. DEPLOY never
+            runs to production.
           </div>
+          <ol className="mode-rail" aria-label="Operating modes">
+            {OPERATING_MODES.map((mode) => (
+              <li
+                key={mode}
+                data-active={state.analysis?.operatingMode === mode ? "true" : "false"}
+              >
+                {mode}
+              </li>
+            ))}
+          </ol>
           {loginSlot}
           <div className="conversation" aria-live="polite">
             {state.lastRequirement ? (
@@ -94,7 +117,7 @@ export function AssistantPanel({
             {state.status === "loading" ? (
               <div className="status status-loading" role="status">
                 <span className="processing-dot" aria-hidden="true" />
-                Processing prompt…
+                Processing ANALYZE → REVIEW…
                 {state.lastRequirement ? (
                   <p className="processing-prompt">{state.lastRequirement}</p>
                 ) : null}
@@ -105,7 +128,12 @@ export function AssistantPanel({
                 {state.errorMessage}
               </div>
             ) : null}
-            {state.analysis ? <AnalysisViews analysis={state.analysis} /> : null}
+            {state.analysis ? (
+              <AnalysisViews
+                analysis={state.analysis}
+                planApproved={state.planApproved}
+              />
+            ) : null}
           </div>
           <form className="composer" onSubmit={onFormSubmit}>
             <label htmlFor="sfcopilot-requirement">Salesforce requirement</label>
@@ -126,10 +154,15 @@ export function AssistantPanel({
             <p className="org-target">Target org host: {targetOrg}</p>
             <div className="composer-actions">
               <button type="submit" className="primary" disabled={state.status === "loading"}>
-                {authenticated ? "Create in org" : "Submit"}
+                {authenticated ? "Run ANALYZE" : "Submit"}
               </button>
-              <button type="button" className="secondary" disabled>
-                Approve validation or deploy
+              <button
+                type="button"
+                className="secondary"
+                disabled={!canApprove}
+                onClick={onApprovePlan}
+              >
+                Approve plan
               </button>
             </div>
           </form>
@@ -139,24 +172,37 @@ export function AssistantPanel({
   );
 }
 
-function AnalysisViews({ analysis }: { analysis: AnalyzeSuccessResponse }) {
+function AnalysisViews({
+  analysis,
+  planApproved
+}: {
+  analysis: AnalyzeSuccessResponse;
+  planApproved: boolean;
+}) {
+  const report = analysis.taskReport;
   return (
     <>
       {analysis.blockedOperations.length > 0 ? (
         <section className="section" aria-label="Blocked operations">
-          <h3>Blocked operations</h3>
-          <ul>
-            {analysis.blockedOperations.map((item) => (
-              <li key={item.type}>
-                {item.reason} Matched: {item.matchedPhrase}
+          <h3>Security stop</h3>
+          {analysis.blockedOperations.map((item) => (
+            <ol key={item.type} className="blocked-report">
+              <li>
+                <strong>What was requested:</strong> {item.reason} Matched “{item.matchedPhrase}”.
               </li>
-            ))}
-          </ul>
+              <li>
+                <strong>Why it is sensitive:</strong> {item.whySensitive}
+              </li>
+              <li>
+                <strong>Manual administrator action:</strong> {item.manualAction}
+              </li>
+            </ol>
+          ))}
         </section>
       ) : null}
       {analysis.clarifyingQuestions.length > 0 ? (
         <section className="section" aria-label="Clarifying questions">
-          <h3>Clarifying questions</h3>
+          <h3>ANALYZE — clarifying questions</h3>
           <ol>
             {analysis.clarifyingQuestions.map((item) => (
               <li key={item.id}>{item.prompt}</li>
@@ -164,15 +210,73 @@ function AnalysisViews({ analysis }: { analysis: AnalyzeSuccessResponse }) {
           </ol>
         </section>
       ) : null}
-      {analysis.structuredRequirement ? (
-        <section className="section" aria-label="Structured requirement">
-          <h3>Structured requirement</h3>
-          <p>{analysis.structuredRequirement.summary}</p>
+      {report ? (
+        <section className="section task-report" aria-label="Required output">
+          <h3>Required output</h3>
+          <ReportBlock title="1. Requirement interpretation">{report.interpretation}</ReportBlock>
+          <ReportBlock title="2. Assumptions">
+            <ul>
+              {report.assumptions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </ReportBlock>
+          <ReportBlock title="3. Files created or changed">
+            <ul>
+              {report.filesCreatedOrChanged.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </ReportBlock>
+          <ReportBlock title="4. Generated Salesforce components">
+            {report.generatedComponents.map((component) => (
+              <div key={component.apiName} className="component-card">
+                <p>
+                  <strong>{component.componentType}</strong> {component.apiName}
+                </p>
+                <p>{component.purpose}</p>
+                <p>Dependencies: {component.dependencies.join(", ") || "None"}</p>
+                <p>Deployment order: {component.deploymentOrder}</p>
+                <p>Security impact: {component.securityImpact}</p>
+                <p>Manual setup: {component.manualSetup}</p>
+                <p>Test scenarios:</p>
+                <ul>
+                  {component.testScenarios.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </ReportBlock>
+          <ReportBlock title="5. Security and permission impact">
+            {report.securityAndPermissionImpact}
+          </ReportBlock>
+          <ReportBlock title="6. Validation and test results">
+            {report.validationAndTestResults}
+          </ReportBlock>
+          <ReportBlock title="7. Deployment preview">{report.deploymentPreview}</ReportBlock>
+          <ReportBlock title="8. Remaining manual steps">
+            <ul>
+              {report.remainingManualSteps.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </ReportBlock>
+          <ReportBlock title="9. Known limitations">
+            <ul>
+              {report.knownLimitations.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </ReportBlock>
+          {planApproved ? (
+            <p className="approval-note">Plan approved. DEPLOY is still a separate sandbox check-only step.</p>
+          ) : null}
         </section>
       ) : null}
       {analysis.implementationPlan.length > 0 ? (
         <section className="section" aria-label="Implementation plan">
-          <h3>Implementation plan</h3>
+          <h3>Mode plan</h3>
           <ol>
             {analysis.implementationPlan.map((step) => (
               <li key={step.id}>
@@ -185,7 +289,7 @@ function AnalysisViews({ analysis }: { analysis: AnalyzeSuccessResponse }) {
       ) : null}
       {analysis.metadataArtifacts.length > 0 ? (
         <section className="section" aria-label="Metadata diff">
-          <h3>Metadata diff</h3>
+          <h3>GENERATE — source format</h3>
           {analysis.metadataArtifacts.map((artifact) => (
             <div key={artifact.filePath}>
               <p>{artifact.filePath}</p>
@@ -196,7 +300,7 @@ function AnalysisViews({ analysis }: { analysis: AnalyzeSuccessResponse }) {
       ) : null}
       {analysis.validation.status !== "not_run" ? (
         <section className="section" aria-label="Validation results">
-          <h3>Validation</h3>
+          <h3>VALIDATE</h3>
           <p>Status: {analysis.validation.status}</p>
           <ul>
             {analysis.validation.issues.map((issue) => (
@@ -205,11 +309,15 @@ function AnalysisViews({ analysis }: { analysis: AnalyzeSuccessResponse }) {
           </ul>
         </section>
       ) : null}
-      {analysis.warning ? (
-        <section className="section" aria-label="Warning">
-          <p>{analysis.warning}</p>
-        </section>
-      ) : null}
     </>
+  );
+}
+
+function ReportBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="report-block">
+      <h4>{title}</h4>
+      {typeof children === "string" ? <p>{children}</p> : children}
+    </div>
   );
 }

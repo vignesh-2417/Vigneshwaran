@@ -27,18 +27,23 @@ export const BlockedOperationTypeSchema = z.enum([
   "permission_set_groups",
   "profiles",
   "sharing_rules",
+  "sharing_settings",
   "user_access",
+  "login_authentication",
   "connected_apps",
   "named_credentials",
   "external_credentials",
   "production_data",
-  "destructive_metadata"
+  "destructive_metadata",
+  "apex_callouts"
 ]);
 export type BlockedOperationType = z.infer<typeof BlockedOperationTypeSchema>;
 
 export const BlockedOperationSchema = z.object({
   type: BlockedOperationTypeSchema,
   reason: z.string().min(1).max(500),
+  whySensitive: z.string().min(1).max(500),
+  manualAction: z.string().min(1).max(500),
   matchedPhrase: z.string().min(1).max(120)
 });
 export type BlockedOperation = z.infer<typeof BlockedOperationSchema>;
@@ -85,6 +90,42 @@ export const ValidationResultSchema = z.object({
 });
 export type ValidationResult = z.infer<typeof ValidationResultSchema>;
 
+export const OperatingModeSchema = z.enum([
+  "ANALYZE",
+  "PLAN",
+  "GENERATE",
+  "VALIDATE",
+  "REVIEW",
+  "DEPLOY"
+]);
+export type OperatingMode = z.infer<typeof OperatingModeSchema>;
+
+export const GeneratedComponentSchema = z.object({
+  componentType: z.string().min(1).max(80),
+  apiName: z.string().min(1).max(120),
+  purpose: z.string().min(1).max(500),
+  dependencies: z.array(z.string().min(1).max(200)).max(20),
+  assumptions: z.array(z.string().min(1).max(300)).max(20),
+  deploymentOrder: z.string().min(1).max(400),
+  testScenarios: z.array(z.string().min(1).max(300)).max(20),
+  securityImpact: z.string().min(1).max(500),
+  manualSetup: z.string().min(1).max(500)
+});
+export type GeneratedComponent = z.infer<typeof GeneratedComponentSchema>;
+
+export const TaskReportSchema = z.object({
+  interpretation: z.string().min(1).max(2_000),
+  assumptions: z.array(z.string().min(1).max(400)).max(20),
+  filesCreatedOrChanged: z.array(z.string().min(1).max(260)).max(50),
+  generatedComponents: z.array(GeneratedComponentSchema).max(20),
+  securityAndPermissionImpact: z.string().min(1).max(2_000),
+  validationAndTestResults: z.string().min(1).max(2_000),
+  deploymentPreview: z.string().min(1).max(2_000),
+  remainingManualSteps: z.array(z.string().min(1).max(400)).max(20),
+  knownLimitations: z.array(z.string().min(1).max(400)).max(20)
+});
+export type TaskReport = z.infer<typeof TaskReportSchema>;
+
 export const DeploymentStatusSchema = z.enum([
   "not_requested",
   "blocked",
@@ -115,7 +156,9 @@ export const AnalyzeSuccessResponseSchema = z.object({
   metadataArtifacts: z.array(MetadataArtifactSchema),
   validation: ValidationResultSchema,
   deploymentStatus: DeploymentStatusSchema,
-  warning: z.string().max(1_000).nullable()
+  operatingMode: OperatingModeSchema,
+  taskReport: TaskReportSchema.nullable(),
+  warning: z.string().max(2_000).nullable()
 });
 export type AnalyzeSuccessResponse = z.infer<typeof AnalyzeSuccessResponseSchema>;
 

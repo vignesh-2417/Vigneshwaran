@@ -5,15 +5,12 @@ import {
   SalesforceLoginPayloadSchema,
   assertAllowedSalesforceLoginHost,
   detectBlockedOperations,
-  parseCustomFieldRequirement,
   parseExtensionRequest,
-  type AnalyzeSuccessResponse,
   type ExtensionResponse
 } from "@sfcopilot/shared";
 import { DEFAULT_BACKEND_URL } from "../config.js";
 import { analyzeRequirementLocally } from "../api/localAnalyze.js";
 import { soapLogin } from "../salesforce/soapLogin.js";
-import { createCustomFieldWithSession } from "../salesforce/toolingField.js";
 
 const FETCH_TIMEOUT_MS = 8_000;
 const SESSION_KEY = "sfcopilot.sfSession";
@@ -106,66 +103,6 @@ async function analyzeViaBackend(payload: unknown) {
   }
 }
 
-async function tryCreateFieldAsUser(
-  plan: AnalyzeSuccessResponse,
-  requirement: string,
-  objectApiName: string | null,
-  session: StoredSalesforceSession
-): Promise<AnalyzeSuccessResponse> {
-  if (plan.blockedOperations.length > 0 || plan.clarifyingQuestions.length > 0) {
-    return plan;
-  }
-  const field = parseCustomFieldRequirement(requirement, objectApiName);
-  try {
-    const created = await createCustomFieldWithSession(
-      session.instanceUrl,
-      session.sessionId,
-      field
-    );
-    return {
-      ...plan,
-      deploymentStatus: "succeeded",
-      warning: created.message,
-      validation: {
-        status: "passed",
-        issues: [
-          {
-            severity: "info",
-            message: created.message,
-            filePath: plan.metadataArtifacts[0]?.filePath ?? null
-          }
-        ]
-      },
-      implementationPlan: [
-        {
-          id: "create-field",
-          title: `Created ${field.apiName} on ${field.objectApiName}`,
-          detail: created.message,
-          metadataType: "CustomField"
-        },
-        ...plan.implementationPlan.filter((step) => step.id !== "create-field")
-      ]
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Salesforce field create failed.";
-    return {
-      ...plan,
-      deploymentStatus: "failed",
-      warning: message,
-      validation: {
-        status: "failed",
-        issues: [
-          {
-            severity: "error",
-            message,
-            filePath: plan.metadataArtifacts[0]?.filePath ?? null
-          }
-        ]
-      }
-    };
-  }
-}
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   try {
     const request = parseExtensionRequest(message);
@@ -220,17 +157,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         if (detectBlockedOperations(parsed.requirement).length > 0) {
           return analyzeRequirementLocally(parsed.requirement, parsed.salesforceContext);
         }
-        let plan = await analyzeViaBackend(request.payload);
-        const session = await readSession();
-        if (plan.ok && session) {
-          plan = await tryCreateFieldAsUser(
-            plan,
-            parsed.requirement,
-            parsed.salesforceContext.objectApiName,
-            session
-          );
-        }
-        return plan;
+        return analyzeViaBackend(request.payload);
       })()
         .then((payload) => sendResponse(jsonResponse(request.requestId, true, payload)))
         .catch((error: unknown) => {

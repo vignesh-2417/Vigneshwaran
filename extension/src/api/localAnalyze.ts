@@ -1,6 +1,8 @@
 import {
   AnalyzeRequestSchema,
-  buildMockCustomFieldPlan,
+  buildAnalyzeModeResponse,
+  buildBlockedAnalyzeResponse,
+  buildGovernedMetadataTask,
   detectBlockedOperations,
   minimizeSalesforceContext,
   type AnalyzeResponse,
@@ -38,47 +40,24 @@ export async function analyzeRequirementLocally(
 
   const blocked = detectBlockedOperations(parsed.data.requirement);
   if (blocked.length > 0) {
-    return {
-      ok: true,
-      correlationId: correlationId(),
-      blockedOperations: blocked,
-      clarifyingQuestions: [],
-      structuredRequirement: null,
-      implementationPlan: [],
-      metadataArtifacts: [],
-      validation: { status: "not_run", issues: [] },
-      deploymentStatus: "blocked",
-      warning:
-        "This request includes blocked Salesforce operations. The assistant will not generate deployment commands or modify the org."
-    };
+    return buildBlockedAnalyzeResponse(correlationId(), blocked);
   }
 
   const needsClarification = parsed.data.requirement.trim().split(/\s+/).length < 6;
   if (needsClarification) {
-    return {
-      ok: true,
-      correlationId: correlationId(),
-      blockedOperations: [],
-      clarifyingQuestions: [
-        {
-          id: "object",
-          prompt: "Which Salesforce object should receive this change?"
-        },
-        {
-          id: "values",
-          prompt: "What field label, type, or picklist values are required?"
-        }
-      ],
-      structuredRequirement: null,
-      implementationPlan: [],
-      metadataArtifacts: [],
-      validation: { status: "not_run", issues: [] },
-      deploymentStatus: "not_requested",
-      warning: null
-    };
+    return buildAnalyzeModeResponse(correlationId(), [
+      {
+        id: "object",
+        prompt: "Which Salesforce object should receive this change?"
+      },
+      {
+        id: "values",
+        prompt: "What field label, type, or picklist values are required?"
+      }
+    ]);
   }
 
-  return buildMockCustomFieldPlan(
+  return buildGovernedMetadataTask(
     parsed.data.requirement,
     parsed.data.salesforceContext.objectApiName,
     correlationId()

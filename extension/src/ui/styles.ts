@@ -15,13 +15,15 @@ export function stylesToCssText(styles: Record<string, CSSProperties>): string {
 }
 
 export const COPILOT_CSS = `
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 :host {
   all: initial;
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 2147483647;
-  font-family: "Salesforce Sans", "Segoe UI", system-ui, sans-serif;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
 *, *::before, *::after {
@@ -122,6 +124,11 @@ button, textarea {
   z-index: 3;
 }
 
+.panel-wide {
+  width: min(720px, calc(100vw - 24px));
+  max-height: min(86vh, 920px);
+}
+
 .panel[data-minimized="true"] {
   max-height: none;
 }
@@ -189,6 +196,32 @@ button, textarea {
   font-size: 12px;
   line-height: 1.4;
   color: #7a0c00;
+}
+
+.mode-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 10px 12px 0;
+  padding: 0;
+}
+
+.mode-rail li {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #ffd27a;
+  background: #fffaf3;
+  color: #7a0c00;
+}
+
+.mode-rail li[data-active="true"] {
+  background: linear-gradient(180deg, #ff9100 0%, #ff4d00 100%);
+  color: #fff8e7;
+  border-color: #e03600;
 }
 
 .conversation {
@@ -286,6 +319,40 @@ button, textarea {
 .section h3 {
   margin: 0 0 8px;
   font-size: 13px;
+}
+
+.task-report h3,
+.report-block h4 {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+.report-block {
+  margin-top: 10px;
+}
+
+.report-block h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: #e03600;
+}
+
+.component-card {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #ffd27a;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.blocked-report {
+  margin: 0 0 12px;
+  padding-left: 18px;
+}
+
+.approval-note {
+  margin: 12px 0 0;
+  font-weight: 600;
+  color: #e03600;
 }
 
 .section ol,

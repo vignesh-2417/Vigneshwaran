@@ -1,6 +1,6 @@
 # Salesforce Metadata Copilot
 
-Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. Users describe a metadata requirement; analysis is mocked for now. The assistant must not modify permission sets, profiles, sharing, named/external credentials, production data, or run destructive metadata operations. Custom field creates run only after the user signs in.
+Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. It prioritizes correctness, security, explainability, and reviewability. ANALYZE → PLAN → GENERATE → VALIDATE → REVIEW run in the popup. DEPLOY is never automatic and never targets production. Permission sets, profiles, sharing, login settings, credentials, production data, destructive changes, and unreviewed Apex callouts are blocked.
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ The huge “error” dump that starts with `var uN=Object.defineProperty` is the
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.5** and click **Reload**
+2. On `chrome://extensions`, confirm version **0.1.6** and click **Reload**
 3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
@@ -52,6 +52,8 @@ Do not load a parent folder, zip, or a stale copy that still has `content.js` st
 - A lava-orange theme, with processing and the current prompt shown in the panel
 - After sign-in, an **OK** button dismisses the login card
 - Username, password, and optional security token stay in `chrome.storage.session` only (not in git)
-- After sign-in, **Create in org** tries Tooling API custom-field create (example: Account.COP_Text__c)
-- Permission sets, profiles, sharing, and destructive changes stay blocked
+- After sign-in, a larger Inter-font review panel shows ANALYZE through REVIEW
+- **Run ANALYZE** produces source-format metadata and a nine-part report
+- **Approve plan** records human review; it does not deploy
+- DEPLOY is never automatic and never production
 - If you are not signed in, Submit asks you to log in instead of showing `Failed to fetch`

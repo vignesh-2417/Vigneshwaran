@@ -19,6 +19,7 @@ export interface AssistantState {
   analysis: AnalyzeSuccessResponse | null;
   lastRequirement: string;
   contextConsent: boolean;
+  planApproved: boolean;
 }
 
 export const EMPTY_ASSISTANT_STATE: AssistantState = {
@@ -35,7 +36,8 @@ export const EMPTY_ASSISTANT_STATE: AssistantState = {
   ],
   analysis: null,
   lastRequirement: "",
-  contextConsent: false
+  contextConsent: false,
+  planApproved: false
 };
 
 export function createMessage(role: ChatRole, text: string): ChatMessage {

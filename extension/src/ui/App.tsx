@@ -103,7 +103,7 @@ export function CopilotApp({
       setState((current) => ({
         ...current,
         status: "error",
-        errorMessage: "Sign in with Salesforce credentials before creating metadata in the org."
+        errorMessage: "Sign in with Salesforce credentials before running ANALYZE."
       }));
       return;
     }
@@ -137,14 +137,10 @@ export function CopilotApp({
       }
       const assistantText =
         result.blockedOperations.length > 0
-          ? "This request is blocked by product policy."
+          ? "Stopped. This request is security-sensitive. See the blocked-change report."
           : result.clarifyingQuestions.length > 0
-            ? "I need a little more detail before planning the change."
-            : result.deploymentStatus === "succeeded"
-              ? "Created the custom field in the org as the signed-in user."
-              : result.deploymentStatus === "failed"
-                ? "Signed in, but Salesforce rejected the field create. See the error below."
-                : "Here is a mock implementation plan. Sign-in was not used to change the org.";
+            ? "ANALYZE needs more detail before PLAN."
+            : "ANALYZE through REVIEW completed. Source was generated. DEPLOY was not run.";
       setState((current) => ({
         ...current,
         status: "idle",
@@ -230,6 +226,19 @@ export function CopilotApp({
           onReset={reset}
           onSubmit={() => {
             void submit();
+          }}
+          onApprovePlan={() => {
+            setState((current) => ({
+              ...current,
+              planApproved: true,
+              messages: [
+                ...current.messages,
+                createMessage(
+                  "system",
+                  "Plan approved. DEPLOY is not automatic. Use a sandbox or scratch org with check-only validation first. Never production automatically."
+                )
+              ]
+            }));
           }}
           onConsentChange={(value) =>
             setState((current) => ({ ...current, contextConsent: value }))
