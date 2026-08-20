@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:content && npm run build:background && npm run copy:manifest",
+    "build": "npm run build:content && npm run build:background && npm run copy:manifest && node scripts/verify-content-bundle.mjs",
     "build:content": "vite build --config vite.content.config.ts",
     "build:background": "vite build --config vite.background.config.ts",
     "copy:manifest": "node ./scripts/copy-manifest.mjs",
