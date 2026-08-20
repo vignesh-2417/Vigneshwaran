@@ -1,6 +1,6 @@
 /**
  * FixForce – content.js
- * Aggressive Salesforce error detection + immediate on-screen alert modal.
+ * Salesforce error detection — reports to extension (no on-page UI).
  */
 
 (function () {
@@ -12,7 +12,6 @@
 
   const ERROR_ANCHORS = [
     "We hit a snag",
-    "We can't save this record",
     "We can't save this record",
     "Review the errors on this page",
     "This error occurred:",
@@ -45,30 +44,13 @@
 
   let lastReportedError = null;
   let lastReportedAt = 0;
-  let dismissedErrorKey = null;
-  let activeModalKey = null;
   let debounceTimer = null;
-  let alertModalEl = null;
-  let pollTimer = null;
-  let stylesInjected = false;
 
   function normalizeText(text) {
     return String(text || "")
       .replace(/[\u2018\u2019\u2032]/g, "'")
       .replace(/\s+/g, " ")
       .trim();
-  }
-
-  function escapeHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function errorKey(text) {
-    return normalizeText(text).slice(0, 280);
   }
 
   function parseUrl(url) {
@@ -103,7 +85,6 @@
     const text = normalizeText(bodyText);
     if (!text) return null;
 
-    // Regex anchors (handles curly apostrophes after normalize)
     const patterns = [
       /We hit a snag[\s\S]{0,2200}?(?=Error ID:|$)/i,
       /We can'?t save this record[\s\S]{0,2200}?(?=Error ID:|$)/i,
@@ -152,179 +133,6 @@
     return [...new Set(all)].sort((a, b) => b.length - a.length)[0];
   }
 
-  function removeAlertModal() {
-    if (alertModalEl) {
-      alertModalEl.remove();
-      alertModalEl = null;
-    }
-    activeModalKey = null;
-  }
-
-  function injectStylesOnce() {
-    if (stylesInjected || document.getElementById("fixforce-alert-styles")) return;
-    stylesInjected = true;
-    const style = document.createElement("style");
-    style.id = "fixforce-alert-styles";
-    style.textContent = `
-      #fixforce-alert-root {
-        position: fixed; inset: 0; z-index: 2147483647;
-        display: flex; align-items: center; justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        animation: ffFadeIn 0.2s ease;
-      }
-      @keyframes ffFadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes ffPopIn {
-        from { opacity: 0; transform: scale(0.92) translateY(8px); }
-        to { opacity: 1; transform: scale(1) translateY(0); }
-      }
-      #fixforce-alert-root .ff-backdrop {
-        position: absolute; inset: 0;
-        background: rgba(0,0,0,0.55);
-        backdrop-filter: blur(2px);
-      }
-      #fixforce-alert-root .ff-modal {
-        position: relative; z-index: 1;
-        width: min(480px, calc(100vw - 32px));
-        max-height: min(85vh, 640px);
-        overflow: auto;
-        background: #0f1117;
-        border: 1px solid rgba(239,68,68,0.45);
-        border-radius: 14px;
-        box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
-        animation: ffPopIn 0.25s ease;
-      }
-      #fixforce-alert-root .ff-modal-header {
-        display: flex; align-items: center; gap: 10px;
-        padding: 14px 16px;
-        background: linear-gradient(90deg, rgba(239,68,68,0.18), rgba(79,142,255,0.08));
-        border-bottom: 1px solid #252a38;
-      }
-      #fixforce-alert-root .ff-icon {
-        width: 36px; height: 36px; border-radius: 8px;
-        background: rgba(239,68,68,0.15);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 18px; flex-shrink: 0;
-      }
-      #fixforce-alert-root .ff-brand { font-size: 13px; font-weight: 800; color: #4f8eff; }
-      #fixforce-alert-root .ff-badge {
-        margin-left: auto;
-        font-size: 10px; padding: 3px 8px; border-radius: 4px;
-        background: rgba(239,68,68,0.15); color: #fca5a5;
-        text-transform: uppercase; letter-spacing: 0.06em;
-      }
-      #fixforce-alert-root .ff-close {
-        background: none; border: none; color: #9ca3af;
-        font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px;
-      }
-      #fixforce-alert-root .ff-body { padding: 16px; color: #e8eaf0; }
-      #fixforce-alert-root .ff-headline {
-        font-size: 15px; font-weight: 700; line-height: 1.45;
-        margin-bottom: 10px; color: #fff;
-      }
-      #fixforce-alert-root .ff-narrative {
-        font-size: 12px; line-height: 1.55; color: #b8bfd0;
-        margin-bottom: 12px;
-      }
-      #fixforce-alert-root .ff-error-box {
-        font-size: 11px; line-height: 1.45; color: #fca5a5;
-        background: rgba(239,68,68,0.08);
-        border: 1px solid rgba(239,68,68,0.2);
-        border-radius: 8px; padding: 10px;
-        margin-bottom: 14px;
-        max-height: 100px; overflow: auto;
-      }
-      #fixforce-alert-root .ff-actions {
-        display: flex; flex-wrap: wrap; gap: 8px;
-      }
-      #fixforce-alert-root .ff-btn {
-        font-size: 12px; padding: 8px 14px; border-radius: 8px;
-        border: none; cursor: pointer; font-weight: 600;
-      }
-      #fixforce-alert-root .ff-btn-primary {
-        background: #4f8eff; color: #fff;
-      }
-      #fixforce-alert-root .ff-btn-primary:hover { background: #3b7be8; }
-      #fixforce-alert-root .ff-btn-secondary {
-        background: #1f2330; color: #e8eaf0;
-        border: 1px solid #353b4d;
-      }
-      #fixforce-alert-root .ff-btn-ghost {
-        background: transparent; color: #9ca3af;
-        border: 1px solid transparent;
-      }
-    `;
-    (document.head || document.documentElement).appendChild(style);
-  }
-
-  function showAlertModal(errorText, context) {
-    const key = errorKey(errorText);
-    if (dismissedErrorKey === key) return;
-    // Already showing this error — do not tear down and rebuild (causes flicker).
-    if (alertModalEl && activeModalKey === key) return;
-
-    const { object } = parseUrl(window.location.href);
-    const analysis = window.FixForceIntelligence
-      ? FixForceIntelligence.analyzeLocally(errorText, context, object)
-      : { classification: { label: "Error" }, helpArticle: { title: "Salesforce Help", url: "https://help.salesforce.com/", summary: errorText.slice(0, 200) }, investigation: { headline: "Salesforce error detected", narrative: errorText.slice(0, 400) } };
-
-    const { classification, helpArticle, investigation } = analysis;
-    const headline = investigation?.headline || helpArticle?.title || "Salesforce Error Detected";
-    const narrative = investigation?.narrative || helpArticle?.summary || errorText.slice(0, 350);
-    const helpUrl = helpArticle?.url || "https://help.salesforce.com/";
-
-    removeAlertModal();
-    injectStylesOnce();
-    activeModalKey = key;
-
-    alertModalEl = document.createElement("div");
-    alertModalEl.id = "fixforce-alert-root";
-    alertModalEl.setAttribute("role", "alertdialog");
-    alertModalEl.setAttribute("aria-modal", "true");
-    alertModalEl.innerHTML = `
-      <div class="ff-backdrop" data-action="dismiss"></div>
-      <div class="ff-modal">
-        <div class="ff-modal-header">
-          <div class="ff-icon">⚡</div>
-          <div>
-            <div class="ff-brand">FixForce Alert</div>
-            <div style="font-size:10px;color:#9ca3af;">Error detected on this page</div>
-          </div>
-          <span class="ff-badge">${escapeHtml(classification.label)}</span>
-          <button class="ff-close" data-action="dismiss" aria-label="Dismiss">×</button>
-        </div>
-        <div class="ff-body">
-          <div class="ff-headline">${escapeHtml(headline)}</div>
-          <div class="ff-narrative">${escapeHtml(narrative)}</div>
-          <div class="ff-error-box">${escapeHtml(errorText.slice(0, 500))}</div>
-          <div class="ff-actions">
-            <a class="ff-btn ff-btn-primary" href="${escapeHtml(helpUrl)}" target="_blank" rel="noopener noreferrer">Open Help Article ↗</a>
-            <button class="ff-btn ff-btn-secondary" data-action="analyze">Analyze in FixForce</button>
-            <button class="ff-btn ff-btn-ghost" data-action="dismiss">Dismiss</button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const dismiss = () => {
-      dismissedErrorKey = key;
-      removeAlertModal();
-    };
-
-    alertModalEl.querySelectorAll('[data-action="dismiss"]').forEach((el) => {
-      el.addEventListener("click", dismiss);
-    });
-
-    alertModalEl.querySelector('[data-action="analyze"]')?.addEventListener("click", () => {
-      chrome.runtime.sendMessage({
-        type: "NEW_ERROR_DETECTED",
-        data: buildPayload(errorText, analysis),
-      });
-      dismiss();
-    });
-
-    (document.documentElement || document.body).appendChild(alertModalEl);
-  }
-
   function buildPayload(errorText, analysis) {
     const url = window.location.href;
     const { object, recordId, context } = parseUrl(url);
@@ -335,47 +143,47 @@
       context,
       url,
       timestamp: new Date().toISOString(),
-      localAnalysis: analysis ? {
-        category: analysis.classification?.category,
-        failureLabel: analysis.classification?.label,
-        failureType: analysis.classification?.failureType,
-        rootCause: analysis.investigation?.narrative,
-        fixSteps: analysis.investigation?.suggestedActions || analysis.helpArticle?.quickChecks || [],
-        confidence: analysis.classification?.confidence || 0.7,
-        investigation: analysis.investigation,
-        helpArticle: analysis.helpArticle,
-      } : null,
+      localAnalysis: analysis
+        ? {
+            category: analysis.classification?.category,
+            failureLabel: analysis.classification?.label,
+            failureType: analysis.classification?.failureType,
+            rootCause: analysis.investigation?.narrative,
+            fixSteps:
+              analysis.investigation?.suggestedActions || analysis.helpArticle?.quickChecks || [],
+            confidence: analysis.classification?.confidence || 0.7,
+            investigation: analysis.investigation,
+            helpArticle: analysis.helpArticle,
+          }
+        : null,
     };
   }
 
   function reportError(errorText) {
     const now = Date.now();
-    const key = errorKey(errorText);
-
     if (errorText === lastReportedError && now - lastReportedAt < DEDUP_WINDOW_MS) {
       return;
     }
 
     lastReportedError = errorText;
     lastReportedAt = now;
-    dismissedErrorKey = null;
 
-    const { context } = parseUrl(window.location.href);
+    const parsed = parseUrl(window.location.href);
     const analysis = window.FixForceIntelligence
-      ? FixForceIntelligence.analyzeLocally(errorText, context, parseUrl(location.href).object)
+      ? FixForceIntelligence.analyzeLocally(errorText, parsed.context, parsed.object)
       : null;
-
-    // Immediate on-screen alert
-    showAlertModal(errorText, context);
 
     chrome.runtime.sendMessage(
       { type: "NEW_ERROR_DETECTED", data: buildPayload(errorText, analysis) },
-      () => { if (chrome.runtime.lastError) { /* ok */ } }
+      () => {
+        if (chrome.runtime.lastError) {
+          /* extension context may be unavailable */
+        }
+      }
     );
   }
 
   function runScan() {
-    if (alertModalEl) return;
     const errorText = scanForErrors();
     if (errorText) reportError(errorText);
   }
@@ -399,7 +207,7 @@
       });
     }
 
-    pollTimer = setInterval(runScan, POLL_INTERVAL_MS);
+    setInterval(runScan, POLL_INTERVAL_MS);
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) runScan();
@@ -428,5 +236,5 @@
     startWatching();
   }
 
-  console.log("[FixForce] v1.3.1 watching", location.hostname);
+  console.log("[FixForce] v1.4 watching (extension alerts only)", location.hostname);
 })();

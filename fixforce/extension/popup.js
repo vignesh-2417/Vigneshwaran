@@ -26,6 +26,9 @@ const $apiErr     = document.getElementById("api-error-state");
 const $apiErrMsg  = document.getElementById("api-error-msg");
 const $statusDot  = document.getElementById("status-dot");
 const $statusText = document.getElementById("status-text");
+const $alertBanner = document.getElementById("extension-alert-banner");
+const $alertTitle = document.getElementById("extension-alert-title");
+const $alertBody = document.getElementById("extension-alert-body");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function showOnly(el) {
@@ -53,6 +56,26 @@ function formatTimestamp(iso) {
   } catch (_) {
     return "";
   }
+}
+
+function showExtensionAlert(pendingAlert) {
+  if (!pendingAlert || !$alertBanner) return;
+  $alertTitle.textContent = pendingAlert.headline || "Salesforce error detected";
+  $alertBody.textContent =
+    pendingAlert.body || truncate(pendingAlert.errorText, 160) || "Click below for analysis and fix steps.";
+  $alertBanner.classList.remove("hidden");
+}
+
+function hideExtensionAlert(dismiss = true) {
+  $alertBanner?.classList.add("hidden");
+  if (dismiss) chrome.runtime.sendMessage({ type: "DISMISS_ALERT" });
+}
+
+function loadPendingAlert() {
+  chrome.storage.local.get(["pendingAlert", "hasUnreadAlert"], ({ pendingAlert, hasUnreadAlert }) => {
+    if (hasUnreadAlert && pendingAlert) showExtensionAlert(pendingAlert);
+    else $alertBanner?.classList.add("hidden");
+  });
 }
 
 // ─── Render Functions ─────────────────────────────────────────────────────────
@@ -215,6 +238,8 @@ function renderResult(data) {
 
   showOnly($result);
   setStatus("error", `Error detected · ${(CATEGORY_META[data.category] || CATEGORY_META.UNKNOWN).label}`);
+  hideExtensionAlert(false);
+  chrome.storage.local.set({ hasUnreadAlert: false });
 }
 
 // ─── Main Load ────────────────────────────────────────────────────────────────
@@ -266,9 +291,12 @@ function loadState() {
 // ─── Action Buttons ───────────────────────────────────────────────────────────
 document.getElementById("btn-clear").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "CLEAR_ERRORS" });
+  hideExtensionAlert();
   showOnly($empty);
   setStatus("active", "Monitoring Salesforce…");
 });
+
+document.getElementById("extension-alert-dismiss")?.addEventListener("click", hideExtensionAlert);
 
 document.getElementById("btn-refresh").addEventListener("click", () => {
   // Ask active tab's content script to scan now
@@ -321,6 +349,13 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === "ANALYSIS_COMPLETE") {
     renderResult(msg.data);
   }
+  if (msg.type === "ERROR_DETECTED") {
+    if (msg.data?.pendingAlert) showExtensionAlert(msg.data.pendingAlert);
+    if (msg.data?.analysis) {
+      showOnly($loading);
+      setStatus("loading", "Analyzing detected error…");
+    }
+  }
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -351,6 +386,7 @@ function scanActiveTabOnOpen() {
 }
 
 loadState();
+loadPendingAlert();
 scanActiveTabOnOpen();
 
 // Poll every 2 s while popup is open to catch updates

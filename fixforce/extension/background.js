@@ -4,6 +4,12 @@
 
 const API_BASE_URL = "http://localhost:3000";
 const MAX_HISTORY_ITEMS = 50;
+const NOTIFICATION_ID = "fixforce-latest-error";
+
+function truncate(str, len = 120) {
+  if (!str) return "";
+  return str.length > len ? str.slice(0, len) + "…" : str;
+}
 
 function setBadgeError() {
   chrome.action.setBadgeText({ text: "!" });
@@ -84,6 +90,42 @@ async function saveAnalysis(errorData, analysis) {
   return item;
 }
 
+function showExtensionAlert(errorData, localItem) {
+  const headline =
+    localItem.investigation?.headline ||
+    localItem.failureLabel ||
+    localItem.helpArticle?.title ||
+    "Salesforce error detected";
+  const body =
+    localItem.rootCause ||
+    localItem.investigation?.narrative ||
+    truncate(errorData.errorText, 180);
+
+  const pendingAlert = {
+    headline,
+    body: truncate(body, 220),
+    errorText: errorData.errorText,
+    timestamp: errorData.timestamp || new Date().toISOString(),
+    object: errorData.object,
+    context: errorData.context,
+  };
+
+  chrome.storage.local.set({ pendingAlert, hasUnreadAlert: true });
+
+  chrome.notifications.create(NOTIFICATION_ID, {
+    type: "basic",
+    iconUrl: "icons/icon128.png",
+    title: `FixForce: ${truncate(headline, 60)}`,
+    message: truncate(body, 240),
+    priority: 2,
+    requireInteraction: false,
+  });
+
+  chrome.runtime
+    .sendMessage({ type: "ERROR_DETECTED", data: { pendingAlert, analysis: localItem } })
+    .catch(() => {});
+}
+
 async function handleNewError(errorData) {
   const localItem = buildItemFromLocal(errorData);
 
@@ -99,6 +141,7 @@ async function handleNewError(errorData) {
     },
   });
   setBadgeError();
+  showExtensionAlert(errorData, localItem);
 
   try {
     setBadgeLoading();
@@ -124,9 +167,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       latestAnalysis: null,
       apiError: null,
       isLoading: false,
+      pendingAlert: null,
+      hasUnreadAlert: false,
     });
+    chrome.notifications.clear(NOTIFICATION_ID);
     setBadgeClear();
     sendResponse({ cleared: true });
+    return false;
+  }
+
+  if (msg.type === "DISMISS_ALERT") {
+    chrome.storage.local.set({ hasUnreadAlert: false });
+    chrome.notifications.clear(NOTIFICATION_ID);
+    sendResponse({ dismissed: true });
     return false;
   }
 
@@ -149,6 +202,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url?.includes("force.com")) {
     chrome.tabs.sendMessage(tabId, { type: "FORCE_SCAN" }).catch(() => {});
+  }
+});
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  if (notificationId !== NOTIFICATION_ID) return;
+  chrome.notifications.clear(NOTIFICATION_ID);
+  chrome.action.openPopup?.().catch(() => {});
+});
+
+chrome.notifications.onClosed.addListener((notificationId) => {
+  if (notificationId === NOTIFICATION_ID) {
+    chrome.storage.local.set({ hasUnreadAlert: false });
   }
 });
 
