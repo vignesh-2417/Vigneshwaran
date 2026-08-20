@@ -30,7 +30,7 @@ export const EMPTY_ASSISTANT_STATE: AssistantState = {
     {
       id: "welcome",
       role: "system",
-      text: "Sign in with your Salesforce user, then describe a metadata requirement. Permission sets, profiles, sharing, credentials, production data, and destructive changes stay blocked."
+      text: "Sign in, then enter a metadata requirement. Processing and results appear in this panel."
     }
   ],
   analysis: null,

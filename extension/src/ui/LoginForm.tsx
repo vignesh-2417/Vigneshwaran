@@ -8,7 +8,7 @@ interface LoginFormProps {
   errorMessage: string | null;
   onLoginHostChange: (value: string) => void;
   onLogin: (input: SalesforceLoginInput) => void;
-  onLogout: () => void;
+  onAcknowledge: () => void;
 }
 
 export function LoginForm({
@@ -18,7 +18,7 @@ export function LoginForm({
   errorMessage,
   onLoginHostChange,
   onLogin,
-  onLogout
+  onAcknowledge
 }: LoginFormProps) {
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,12 +34,8 @@ export function LoginForm({
   if (auth.authenticated) {
     return (
       <div className="login-card login-card-ok">
-        <p>
-          Logged in as <strong>{auth.username}</strong>
-        </p>
-        <p className="org-target">{auth.instanceUrl}</p>
-        <button type="button" className="secondary" onClick={onLogout}>
-          Sign out
+        <button type="button" className="primary" onClick={onAcknowledge}>
+          OK
         </button>
       </div>
     );

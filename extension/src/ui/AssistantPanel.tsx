@@ -9,6 +9,7 @@ interface AssistantPanelProps {
   right: number;
   requirement: string;
   authenticated: boolean;
+  signedInAs?: string | null;
   loginSlot?: ReactNode;
   onRequirementChange: (value: string) => void;
   onClose: () => void;
@@ -25,6 +26,7 @@ export function AssistantPanel({
   right,
   requirement,
   authenticated,
+  signedInAs,
   loginSlot,
   onRequirementChange,
   onClose,
@@ -51,6 +53,7 @@ export function AssistantPanel({
         <h1 className="panel-title" id="sfcopilot-title">
           {PRODUCT_NAME}
         </h1>
+        {signedInAs ? <span className="signed-in-as">{signedInAs}</span> : null}
         <div className="header-actions">
           <button type="button" className="icon-action" aria-label="Reset conversation" onClick={onReset}>
             Reset
@@ -77,6 +80,12 @@ export function AssistantPanel({
           </div>
           {loginSlot}
           <div className="conversation" aria-live="polite">
+            {state.lastRequirement ? (
+              <section className="prompt-card" aria-label="Current prompt">
+                <h3>Prompt</h3>
+                <p>{state.lastRequirement}</p>
+              </section>
+            ) : null}
             {state.messages.map((message) => (
               <div key={message.id} className={`message message-${message.role}`}>
                 {message.text}
@@ -84,7 +93,11 @@ export function AssistantPanel({
             ))}
             {state.status === "loading" ? (
               <div className="status status-loading" role="status">
-                Analyzing requirement…
+                <span className="processing-dot" aria-hidden="true" />
+                Processing prompt…
+                {state.lastRequirement ? (
+                  <p className="processing-prompt">{state.lastRequirement}</p>
+                ) : null}
               </div>
             ) : null}
             {state.status === "error" && state.errorMessage ? (

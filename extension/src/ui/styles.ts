@@ -111,11 +111,13 @@ button, textarea {
   max-height: min(640px, calc(100vh - 120px));
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  color: #181818;
-  border: 1px solid #c9c9c9;
+  background: #fff7ef;
+  color: #3b1400;
+  border: 1px solid #ffb347;
   border-radius: 12px;
-  box-shadow: 0 16px 40px rgba(24, 24, 24, 0.2);
+  box-shadow:
+    0 0 12px rgba(255, 122, 0, 0.35),
+    0 16px 40px rgba(122, 12, 0, 0.28);
   overflow: hidden;
   z-index: 3;
 }
@@ -129,8 +131,8 @@ button, textarea {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #032d60;
-  color: #ffffff;
+  background: linear-gradient(135deg, #ff9a1f 0%, #ff6a00 42%, #e03600 100%);
+  color: #fff8e7;
 }
 
 .panel-title {
@@ -157,8 +159,17 @@ button, textarea {
 
 .icon-action:hover,
 .icon-action:focus-visible {
-  background: rgba(255, 255, 255, 0.16);
-  outline: 2px solid #90d0fe;
+  background: rgba(255, 248, 231, 0.2);
+  outline: 2px solid #ffe08a;
+}
+
+.signed-in-as {
+  font-size: 11px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff8e7;
 }
 
 .panel-body {
@@ -166,17 +177,18 @@ button, textarea {
   flex-direction: column;
   min-height: 0;
   flex: 1;
-  background: #f3f3f3;
+  background: #fff1e2;
 }
 
 .privacy-banner {
   margin: 12px 12px 0;
   padding: 8px 10px;
-  background: #fef7e6;
-  border: 1px solid #dd7a01;
+  background: #fff4d6;
+  border: 1px solid #ff7a00;
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.4;
+  color: #7a0c00;
 }
 
 .conversation {
@@ -200,14 +212,59 @@ button, textarea {
 
 .message-user {
   align-self: flex-end;
-  background: #e4f3ff;
+  background: #ffe0b8;
+  border: 1px solid #ffb347;
 }
 
 .message-assistant,
 .message-system {
   align-self: stretch;
-  background: #ffffff;
-  border: 1px solid #e5e5e5;
+  background: #fffaf3;
+  border: 1px solid #ffd27a;
+}
+
+.prompt-card {
+  background: #fffaf3;
+  border: 1px solid #ff7a00;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.prompt-card h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #e03600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prompt-card p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.status-loading {
+  color: #e03600;
+  background: #fff4d6;
+  border: 1px solid #ffb347;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.processing-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff6a00;
+  box-shadow: 0 0 10px #ff6a00;
+  animation: lava-pulse 1.2s ease-in-out infinite;
+}
+
+.processing-prompt {
+  margin: 0;
+  color: #3b1400;
 }
 
 .status {
@@ -215,17 +272,13 @@ button, textarea {
   font-size: 13px;
 }
 
-.status-loading {
-  color: #032d60;
-}
-
 .status-error {
   color: #ba0517;
 }
 
 .section {
-  background: #ffffff;
-  border: 1px solid #e5e5e5;
+  background: #fffaf3;
+  border: 1px solid #ffd27a;
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -257,22 +310,23 @@ button, textarea {
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: #ffffff;
-  border-top: 1px solid #e5e5e5;
+  background: #fffaf3;
+  border-top: 1px solid #ffb347;
 }
 
 .composer textarea {
   width: 100%;
   min-height: 72px;
   resize: vertical;
-  border: 1px solid #aeaeae;
+  border: 1px solid #ffb347;
   border-radius: 8px;
   padding: 8px;
+  background: #fffdf8;
 }
 
 .composer textarea:focus-visible {
-  outline: 2px solid #0176d3;
-  border-color: #0176d3;
+  outline: 2px solid #ff6a00;
+  border-color: #ff6a00;
 }
 
 .composer-actions {
@@ -291,13 +345,15 @@ button, textarea {
 
 .primary {
   border: 0;
-  background: #0176d3;
-  color: #ffffff;
+  background: linear-gradient(180deg, #ff9100 0%, #ff4d00 100%);
+  color: #fff8e7;
+  font-weight: 650;
 }
 
 .primary:hover,
 .primary:focus-visible {
-  background: #0b5cab;
+  background: linear-gradient(180deg, #ffb347 0%, #e03600 100%);
+  outline: 2px solid #ffe08a;
 }
 
 .primary:disabled,
@@ -307,8 +363,9 @@ button, textarea {
 }
 
 .secondary {
-  border: 1px solid #c9c9c9;
-  background: #ffffff;
+  border: 1px solid #ffb347;
+  background: #fff7ef;
+  color: #7a0c00;
 }
 
 .org-target {
@@ -320,13 +377,15 @@ button, textarea {
   pointer-events: auto;
   margin: 0;
   padding: 10px 12px;
-  background: #ffffff;
-  border: 1px solid #c9c9c9;
+  background: #fff7ef;
+  border: 1px solid #ffb347;
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
+  color: #3b1400;
+  box-shadow: 0 0 16px rgba(255, 106, 0, 0.35);
 }
 
 .login-float {
@@ -350,8 +409,9 @@ button, textarea {
 }
 
 .login-card-ok {
-  background: #eef8f1;
-  border-color: #91c4a0;
+  background: #fff4d6;
+  border-color: #ff7a00;
+  align-items: stretch;
 }
 
 @media (max-width: 480px) {

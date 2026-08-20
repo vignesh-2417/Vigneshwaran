@@ -49,6 +49,7 @@ export function CopilotApp({
   );
   const [loginStatus, setLoginStatus] = useState<"idle" | "loading" | "error">("idle");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginAcknowledged, setLoginAcknowledged] = useState(false);
   const context = useMemo(() => getContext(), [getContext, state.open]);
 
   useEffect(() => {
@@ -174,25 +175,23 @@ export function CopilotApp({
           .then((next) => {
             setAuth(next);
             setLoginStatus("idle");
-            setState((current) => ({
-              ...current,
-              open: true,
-              messages: [
-                ...current.messages,
-                createMessage("system", `Signed in as ${next.username}. Submit a requirement to run it as this user.`)
-              ]
-            }));
+            setLoginAcknowledged(false);
           })
           .catch((error: unknown) => {
             setLoginStatus("error");
             setLoginError(error instanceof Error ? error.message : "Salesforce login failed.");
           });
       }}
-      onLogout={() => {
-        void api.logout().then(() => {
-          setAuth(ANONYMOUS);
-          setLoginError(null);
-        });
+      onAcknowledge={() => {
+        setLoginAcknowledged(true);
+        setState((current) => ({
+          ...current,
+          open: true,
+          messages: [
+            ...current.messages,
+            createMessage("system", "Signed in. Enter a requirement to process it as this user.")
+          ]
+        }));
       }}
     />
   );
@@ -206,17 +205,20 @@ export function CopilotApp({
         onToggle={toggle}
         onPositionChange={updatePosition}
       />
-      <div
-        className="login-float"
-        style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
-      >
-        {loginForm}
-      </div>
+      {loginAcknowledged ? null : (
+        <div
+          className="login-float"
+          style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
+        >
+          {loginForm}
+        </div>
+      )}
       {state.open ? (
         <AssistantPanel
           state={state}
           targetOrg={context.hostname}
-          top={position.top + (auth.authenticated ? 168 : 312)}
+          signedInAs={auth.username}
+          top={position.top + 64}
           right={position.right}
           requirement={requirement}
           authenticated={auth.authenticated}

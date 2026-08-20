@@ -28,7 +28,7 @@ async function signIn(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Salesforce username"), "user@example.com");
   await user.type(screen.getByLabelText("Password"), "not-a-real-password");
   await user.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(await screen.findByText(/Logged in as/)).toBeInTheDocument();
+  await user.click(await screen.findByRole("button", { name: "OK" }));
 }
 
 afterEach(() => {
@@ -54,7 +54,8 @@ describe("assistant panel", () => {
     await user.type(screen.getByLabelText("Salesforce username"), "user@example.com");
     await user.type(screen.getByLabelText("Password"), "not-a-real-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText(/Logged in as/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "OK" }));
+    expect(screen.queryByLabelText("Salesforce username")).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Salesforce Metadata Copilot" })).toBeInTheDocument();
   });
 
@@ -100,7 +101,7 @@ describe("assistant panel", () => {
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
     await user.click(screen.getByRole("button", { name: "Create in org" }));
-    expect(screen.getByRole("status")).toHaveTextContent(/Analyzing requirement/);
+    expect(screen.getByRole("status")).toHaveTextContent(/Processing prompt/);
     release();
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
   });
@@ -134,6 +135,9 @@ describe("assistant panel", () => {
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
     await user.click(screen.getByRole("button", { name: "Create in org" }));
+    expect(await screen.findByRole("region", { name: "Current prompt" })).toHaveTextContent(
+      "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
+    );
     expect(await screen.findByRole("region", { name: "Implementation plan" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Metadata diff" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Validation results" })).toBeInTheDocument();
