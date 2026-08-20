@@ -1,13 +1,13 @@
 # Salesforce Metadata Copilot
 
-Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. Users describe a metadata requirement; analysis is mocked for now. The assistant must not auto-modify or deploy permission sets, profiles, sharing, credentials, production data, or destructive metadata.
+Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. Users describe a metadata requirement; analysis is mocked for now. The assistant must not modify permission sets, profiles, sharing, named/external credentials, production data, or run destructive metadata operations. Custom field creates run only after the user signs in.
 
 ## Prerequisites
 
 - Node.js 20+
 - npm 10+
 - Chrome 120+
-- Optional backend: `npm run start -w backend` on `http://127.0.0.1:8787`
+- Optional backend: `npm run start -w backend` on `http://127.0.0.1:8787` (if it is down, the extension falls back to a local mock plan)
 
 ## Build the extension
 
@@ -40,7 +40,7 @@ The huge “error” dump that starts with `var uN=Object.defineProperty` is the
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.1** and click **Reload**
+2. On `chrome://extensions`, confirm version **0.1.3** and click **Reload**
 3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
@@ -48,5 +48,8 @@ Do not load a parent folder, zip, or a stale copy that still has `content.js` st
 ## Expected UI
 
 - Orange neon lava circle, top-right (below the Lightning header)
-- Click to open the panel
-- Submit needs the backend on port 8787 when using the background API
+- The login panel opens with the icon so you can sign in as the org user
+- Username, password, and optional security token stay in `chrome.storage.session` only (not in git)
+- After sign-in, **Create in org** tries Tooling API custom-field create (example: Account.COP_Text__c)
+- Permission sets, profiles, sharing, and destructive changes stay blocked
+- If you are not signed in, Submit asks you to log in instead of showing `Failed to fetch`

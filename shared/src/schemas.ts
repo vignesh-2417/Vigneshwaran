@@ -143,8 +143,18 @@ export type AnalyzeResponse = z.infer<typeof AnalyzeResponseSchema>;
 
 export const MESSAGE_PROTOCOL_VERSION = 1 as const;
 
+export const SalesforceLoginPayloadSchema = z.object({
+  username: z.string().trim().min(1).max(255),
+  password: z.string().min(1).max(255),
+  securityToken: z.string().max(128).default(""),
+  loginHost: z.string().trim().min(1).max(255)
+});
+export type SalesforceLoginPayload = z.infer<typeof SalesforceLoginPayloadSchema>;
+
 export const ExtensionMessageTypeSchema = z.enum([
   "ANALYZE_REQUIREMENT",
+  "LOGIN_SALESFORCE",
+  "LOGOUT_SALESFORCE",
   "GET_AUTH_STATE",
   "PING"
 ]);

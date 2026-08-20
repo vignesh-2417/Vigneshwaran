@@ -21,7 +21,10 @@ async function readJson(req: IncomingMessage): Promise<unknown> {
 function send(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
+    "cache-control": "no-store",
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "content-type, authorization",
+    "access-control-allow-methods": "GET, POST, OPTIONS"
   });
   res.end(JSON.stringify(body));
 }
@@ -29,6 +32,10 @@ function send(res: ServerResponse, status: number, body: unknown): void {
 export function startServer(port = PORT) {
   const server = createServer((req, res) => {
     void (async () => {
+      if (req.method === "OPTIONS") {
+        send(res, 204, { ok: true });
+        return;
+      }
       if (req.method === "GET" && req.url === "/health") {
         send(res, 200, { ok: true });
         return;

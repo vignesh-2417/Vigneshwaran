@@ -2,13 +2,29 @@ import {
   AnalyzeRequestSchema,
   AnalyzeResponseSchema,
   MESSAGE_PROTOCOL_VERSION,
+  SalesforceLoginPayloadSchema,
+  assertAllowedSalesforceLoginHost,
+  detectBlockedOperations,
+  parseCustomFieldRequirement,
   parseExtensionRequest,
+  type AnalyzeSuccessResponse,
   type ExtensionResponse
 } from "@sfcopilot/shared";
 import { DEFAULT_BACKEND_URL } from "../config.js";
+import { analyzeRequirementLocally } from "../api/localAnalyze.js";
+import { soapLogin } from "../salesforce/soapLogin.js";
+import { createCustomFieldWithSession } from "../salesforce/toolingField.js";
 
 const FETCH_TIMEOUT_MS = 8_000;
+const SESSION_KEY = "sfcopilot.sfSession";
 let mockAuthToken = "mock-session-token";
+let memorySession: StoredSalesforceSession | null = null;
+
+interface StoredSalesforceSession {
+  username: string;
+  instanceUrl: string;
+  sessionId: string;
+}
 
 function jsonResponse(
   requestId: string,
@@ -25,7 +41,49 @@ function jsonResponse(
   };
 }
 
-async function analyzeViaBackend(payload: unknown): Promise<unknown> {
+async function readSession(): Promise<StoredSalesforceSession | null> {
+  const area = chrome.storage?.session;
+  if (!area) {
+    return memorySession;
+  }
+  const value = await area.get(SESSION_KEY);
+  const stored = value[SESSION_KEY];
+  if (
+    stored &&
+    typeof stored === "object" &&
+    "username" in stored &&
+    "instanceUrl" in stored &&
+    "sessionId" in stored
+  ) {
+    memorySession = stored as StoredSalesforceSession;
+    return memorySession;
+  }
+  return memorySession;
+}
+
+async function writeSession(session: StoredSalesforceSession | null): Promise<void> {
+  memorySession = session;
+  const area = chrome.storage?.session;
+  if (!area) {
+    return;
+  }
+  if (session) {
+    await area.set({ [SESSION_KEY]: session });
+    return;
+  }
+  await area.remove(SESSION_KEY);
+}
+
+function authPayload(session: StoredSalesforceSession | null) {
+  return {
+    authenticated: Boolean(session),
+    username: session?.username ?? null,
+    instanceUrl: session?.instanceUrl ?? null,
+    mode: session ? "session" : "anonymous"
+  };
+}
+
+async function analyzeViaBackend(payload: unknown) {
   const parsed = AnalyzeRequestSchema.parse(payload);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -41,18 +99,70 @@ async function analyzeViaBackend(payload: unknown): Promise<unknown> {
     });
     const data: unknown = await response.json();
     return AnalyzeResponseSchema.parse(data);
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return {
-        ok: false,
-        correlationId: crypto.randomUUID(),
-        code: "TIMEOUT",
-        message: "The analysis request timed out."
-      };
-    }
-    throw error;
+  } catch {
+    return analyzeRequirementLocally(parsed.requirement, parsed.salesforceContext);
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function tryCreateFieldAsUser(
+  plan: AnalyzeSuccessResponse,
+  requirement: string,
+  objectApiName: string | null,
+  session: StoredSalesforceSession
+): Promise<AnalyzeSuccessResponse> {
+  if (plan.blockedOperations.length > 0 || plan.clarifyingQuestions.length > 0) {
+    return plan;
+  }
+  const field = parseCustomFieldRequirement(requirement, objectApiName);
+  try {
+    const created = await createCustomFieldWithSession(
+      session.instanceUrl,
+      session.sessionId,
+      field
+    );
+    return {
+      ...plan,
+      deploymentStatus: "succeeded",
+      warning: created.message,
+      validation: {
+        status: "passed",
+        issues: [
+          {
+            severity: "info",
+            message: created.message,
+            filePath: plan.metadataArtifacts[0]?.filePath ?? null
+          }
+        ]
+      },
+      implementationPlan: [
+        {
+          id: "create-field",
+          title: `Created ${field.apiName} on ${field.objectApiName}`,
+          detail: created.message,
+          metadataType: "CustomField"
+        },
+        ...plan.implementationPlan.filter((step) => step.id !== "create-field")
+      ]
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Salesforce field create failed.";
+    return {
+      ...plan,
+      deploymentStatus: "failed",
+      warning: message,
+      validation: {
+        status: "failed",
+        issues: [
+          {
+            severity: "error",
+            message,
+            filePath: plan.metadataArtifacts[0]?.filePath ?? null
+          }
+        ]
+      }
+    };
   }
 }
 
@@ -64,16 +174,64 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return false;
     }
     if (request.type === "GET_AUTH_STATE") {
-      sendResponse(
-        jsonResponse(request.requestId, true, {
-          authenticated: Boolean(mockAuthToken),
-          mode: "mock"
-        })
-      );
-      return false;
+      void readSession().then((session) => {
+        sendResponse(jsonResponse(request.requestId, true, authPayload(session)));
+      });
+      return true;
+    }
+    if (request.type === "LOGOUT_SALESFORCE") {
+      void writeSession(null).then(() => {
+        sendResponse(jsonResponse(request.requestId, true, authPayload(null)));
+      });
+      return true;
+    }
+    if (request.type === "LOGIN_SALESFORCE") {
+      void (async () => {
+        const login = SalesforceLoginPayloadSchema.parse(request.payload);
+        const loginHost = assertAllowedSalesforceLoginHost(login.loginHost);
+        const session = await soapLogin(
+          loginHost,
+          login.username,
+          login.password,
+          login.securityToken
+        );
+        const stored = {
+          username: session.username,
+          instanceUrl: session.instanceUrl,
+          sessionId: session.sessionId
+        };
+        await writeSession(stored);
+        sendResponse(jsonResponse(request.requestId, true, authPayload(stored)));
+      })().catch((error: unknown) => {
+        const messageText =
+          error instanceof Error ? error.message : "Salesforce login failed";
+        sendResponse(
+          jsonResponse(request.requestId, false, undefined, {
+            code: "UNAUTHORIZED",
+            message: messageText.slice(0, 400)
+          })
+        );
+      });
+      return true;
     }
     if (request.type === "ANALYZE_REQUIREMENT") {
-      void analyzeViaBackend(request.payload)
+      void (async () => {
+        const parsed = AnalyzeRequestSchema.parse(request.payload);
+        if (detectBlockedOperations(parsed.requirement).length > 0) {
+          return analyzeRequirementLocally(parsed.requirement, parsed.salesforceContext);
+        }
+        let plan = await analyzeViaBackend(request.payload);
+        const session = await readSession();
+        if (plan.ok && session) {
+          plan = await tryCreateFieldAsUser(
+            plan,
+            parsed.requirement,
+            parsed.salesforceContext.objectApiName,
+            session
+          );
+        }
+        return plan;
+      })()
         .then((payload) => sendResponse(jsonResponse(request.requestId, true, payload)))
         .catch((error: unknown) => {
           const messageText =

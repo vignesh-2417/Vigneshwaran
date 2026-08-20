@@ -1,11 +1,11 @@
 import { z } from "zod";
 import {
   AnalyzeRequestSchema,
+  buildMockCustomFieldPlan,
   detectBlockedOperations,
   minimizeSalesforceContext,
   type AnalyzeErrorResponse,
-  type AnalyzeResponse,
-  type AnalyzeSuccessResponse
+  type AnalyzeResponse
 } from "@sfcopilot/shared";
 import { createCorrelationId, logSafeEvent } from "./logger.js";
 
@@ -18,50 +18,6 @@ function errorResponse(
   message: string
 ): AnalyzeErrorResponse {
   return { ok: false, correlationId, code, message };
-}
-
-function mockPlan(requirement: string, objectApiName: string | null, correlationId: string): AnalyzeSuccessResponse {
-  const objectName = objectApiName ?? "Account";
-  return {
-    ok: true,
-    correlationId,
-    blockedOperations: [],
-    clarifyingQuestions: [],
-    structuredRequirement: {
-      summary: requirement.slice(0, 500),
-      objectApiName: objectName,
-      requestedChanges: ["Create Customer_Tier__c picklist"]
-    },
-    implementationPlan: [
-      {
-        id: "create-field",
-        title: "Create Customer_Tier__c",
-        detail: `Create a picklist field on ${objectName}. No deployment command is generated during analysis.`,
-        metadataType: "CustomField"
-      }
-    ],
-    metadataArtifacts: [
-      {
-        filePath: `force-app/main/default/objects/${objectName}/fields/Customer_Tier__c.field-meta.xml`,
-        metadataType: "CustomField",
-        before: null,
-        after:
-          "<CustomField><fullName>Customer_Tier__c</fullName><label>Customer Tier</label><type>Picklist</type></CustomField>"
-      }
-    ],
-    validation: {
-      status: "passed",
-      issues: [
-        {
-          severity: "info",
-          message: "Mock validation succeeded. The org was not modified.",
-          filePath: null
-        }
-      ]
-    },
-    deploymentStatus: "not_requested",
-    warning: null
-  };
 }
 
 export interface AnalyzeHandlerOptions {
@@ -172,7 +128,7 @@ export async function handleAnalyze(
     };
   }
 
-  const body = mockPlan(
+  const body = buildMockCustomFieldPlan(
     minimized.requirement,
     minimized.salesforceContext.objectApiName,
     correlationId

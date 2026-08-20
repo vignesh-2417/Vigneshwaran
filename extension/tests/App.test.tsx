@@ -16,9 +16,19 @@ const context: SalesforceContext = {
 };
 
 function renderApp(
-  api: MockAssistantApi = new MockAssistantApi(analyzeRequirementLocally)
+  api: MockAssistantApi = new MockAssistantApi(analyzeRequirementLocally),
+  initialOpen = false
 ) {
-  return render(<CopilotApp api={api} getContext={() => context} />);
+  return render(
+    <CopilotApp api={api} getContext={() => context} initialOpen={initialOpen} />
+  );
+}
+
+async function signIn(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("Salesforce username"), "user@example.com");
+  await user.type(screen.getByLabelText("Password"), "not-a-real-password");
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText(/Logged in as/)).toBeInTheDocument();
 }
 
 afterEach(() => {
@@ -34,6 +44,31 @@ describe("assistant panel", () => {
     expect(screen.getByRole("dialog", { name: "Salesforce Metadata Copilot" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close assistant" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("asks for Salesforce credentials when the panel opens", async () => {
+    const user = userEvent.setup();
+    renderApp(new MockAssistantApi(analyzeRequirementLocally), true);
+    expect(screen.getByLabelText("Salesforce username")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Salesforce username"), "user@example.com");
+    await user.type(screen.getByLabelText("Password"), "not-a-real-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText(/Logged in as/)).toBeInTheDocument();
+    expect(screen.getByText("user@example.com")).toBeInTheDocument();
+  });
+
+  it("requires login before creating metadata", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    await user.click(screen.getByRole("checkbox"));
+    await user.type(
+      screen.getByLabelText("Salesforce requirement"),
+      'Create a custom text field "COP Text" in Account object'
+    );
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/Sign in with Salesforce credentials/);
   });
 
   it("shows an error for an empty request", async () => {
@@ -58,12 +93,13 @@ describe("assistant panel", () => {
     });
     renderApp(new MockAssistantApi(() => deferred));
     await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    await signIn(user);
     await user.click(screen.getByRole("checkbox"));
     await user.type(
       screen.getByLabelText("Salesforce requirement"),
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
-    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Create in org" }));
     expect(screen.getByRole("status")).toHaveTextContent(/Analyzing requirement/);
     release();
     await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
@@ -80,9 +116,10 @@ describe("assistant panel", () => {
       }))
     );
     await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    await signIn(user);
     await user.click(screen.getByRole("checkbox"));
     await user.type(screen.getByLabelText("Salesforce requirement"), "Create a Customer Tier field");
-    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Create in org" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Mock backend unavailable");
   });
 
@@ -90,12 +127,13 @@ describe("assistant panel", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    await signIn(user);
     await user.click(screen.getByRole("checkbox"));
     await user.type(
       screen.getByLabelText("Salesforce requirement"),
       "Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
     );
-    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Create in org" }));
     expect(await screen.findByRole("region", { name: "Implementation plan" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Metadata diff" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Validation results" })).toBeInTheDocument();

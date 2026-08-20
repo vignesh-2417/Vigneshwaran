@@ -8,10 +8,11 @@ class StorageMock {
     callback({});
   };
   public set = (_items: Record<string, unknown>) => Promise.resolve();
+  public remove = (_keys: string | string[]) => Promise.resolve();
 }
 
 const chromeMock = {
-  storage: { local: new StorageMock() },
+  storage: { local: new StorageMock(), session: new StorageMock() },
   runtime: {
     sendMessage: undefined,
     onMessage: { addListener: () => undefined },

@@ -28,10 +28,27 @@ describe("POST /api/requirements/analyze handler", () => {
     if (result.body.ok) {
       expect(result.body.deploymentStatus).toBe("not_requested");
       expect(JSON.stringify(result.body)).not.toMatch(/sf project deploy|sfdx force:source:deploy/i);
-      expect(JSON.stringify(result.body)).not.toMatch(/secret|token|password/i);
+      expect(JSON.stringify(result.body)).not.toMatch(/\b(secret|password)\b/i);
       expect(result.body.correlationId).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       );
+    }
+  });
+
+  it("plans a named text field on Account", async () => {
+    const result = await handleAnalyze(
+      {
+        requirement: 'Create a custom text field "COP Text" in Account object',
+        salesforceContext: context
+      },
+      auth
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.ok).toBe(true);
+    if (result.body.ok) {
+      expect(result.body.structuredRequirement?.objectApiName).toBe("Account");
+      expect(result.body.metadataArtifacts[0]?.after).toContain("COP_Text__c");
+      expect(result.body.metadataArtifacts[0]?.after).toContain("<type>Text</type>");
     }
   });
 

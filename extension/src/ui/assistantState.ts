@@ -30,7 +30,7 @@ export const EMPTY_ASSISTANT_STATE: AssistantState = {
     {
       id: "welcome",
       role: "system",
-      text: "Describe a Salesforce metadata requirement. This assistant will not change permission sets, profiles, sharing, credentials, production data, or deploy changes without approval."
+      text: "Sign in with your Salesforce user, then describe a metadata requirement. Permission sets, profiles, sharing, credentials, production data, and destructive changes stay blocked."
     }
   ],
   analysis: null,

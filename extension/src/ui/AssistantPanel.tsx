@@ -1,5 +1,5 @@
 import { PRODUCT_NAME, type AnalyzeSuccessResponse } from "@sfcopilot/shared";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type { AssistantState } from "./assistantState.js";
 
 interface AssistantPanelProps {
@@ -8,6 +8,8 @@ interface AssistantPanelProps {
   top: number;
   right: number;
   requirement: string;
+  authenticated: boolean;
+  loginSlot: ReactNode;
   onRequirementChange: (value: string) => void;
   onClose: () => void;
   onMinimize: () => void;
@@ -22,6 +24,8 @@ export function AssistantPanel({
   top,
   right,
   requirement,
+  authenticated,
+  loginSlot,
   onRequirementChange,
   onClose,
   onMinimize,
@@ -67,9 +71,11 @@ export function AssistantPanel({
       {!state.minimized ? (
         <div className="panel-body">
           <div className="privacy-banner" role="note">
-            Page context (hostname, URL route, object, and record ID when present) is sent to the
-            backend only after you submit. Field values are never read from the page.
+            {authenticated
+              ? "Signed-in requests try to create allowed custom fields in this org via the Tooling API. Permission sets, profiles, sharing, credentials, and destructive changes stay blocked."
+              : "Sign in first. Until you do, Submit returns a mock plan only and does not create fields in Salesforce."}
           </div>
+          {loginSlot}
           <div className="conversation" aria-live="polite">
             {state.messages.map((message) => (
               <div key={message.id} className={`message message-${message.role}`}>
@@ -94,7 +100,7 @@ export function AssistantPanel({
               id="sfcopilot-requirement"
               value={requirement}
               onChange={(event) => onRequirementChange(event.target.value)}
-              placeholder="Create a Customer Tier picklist field on Account with Gold, Silver, and Bronze values."
+              placeholder='Create a custom text field "COP Text" in Account object'
             />
             <label>
               <input
@@ -107,7 +113,7 @@ export function AssistantPanel({
             <p className="org-target">Target org host: {targetOrg}</p>
             <div className="composer-actions">
               <button type="submit" className="primary" disabled={state.status === "loading"}>
-                Submit
+                {authenticated ? "Create in org" : "Submit"}
               </button>
               <button type="button" className="secondary" disabled>
                 Approve validation or deploy

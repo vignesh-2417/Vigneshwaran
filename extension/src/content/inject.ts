@@ -110,6 +110,7 @@ export async function injectAssistant(
           api,
           getContext: browserContext,
           initialPosition: position,
+          initialOpen: true,
           onPositionChange: persistPosition
         })
       )

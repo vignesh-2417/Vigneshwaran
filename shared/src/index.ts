@@ -4,3 +4,5 @@ export * from "./hosts.js";
 export * from "./salesforceContext.js";
 export * from "./blockedOperations.js";
 export * from "./messaging.js";
+export * from "./mockPlan.js";
+export * from "./loginHost.js";

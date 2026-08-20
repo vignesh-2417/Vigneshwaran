@@ -1,5 +1,6 @@
 import {
   AnalyzeRequestSchema,
+  buildMockCustomFieldPlan,
   detectBlockedOperations,
   minimizeSalesforceContext,
   type AnalyzeResponse,
@@ -65,7 +66,7 @@ export async function analyzeRequirementLocally(
         },
         {
           id: "values",
-          prompt: "What picklist values or field attributes are required?"
+          prompt: "What field label, type, or picklist values are required?"
         }
       ],
       structuredRequirement: null,
@@ -77,50 +78,9 @@ export async function analyzeRequirementLocally(
     };
   }
 
-  const objectApiName = salesforceContext.objectApiName ?? "Account";
-  return {
-    ok: true,
-    correlationId: correlationId(),
-    blockedOperations: [],
-    clarifyingQuestions: [],
-    structuredRequirement: {
-      summary: parsed.data.requirement.slice(0, 500),
-      objectApiName,
-      requestedChanges: ["Add custom picklist field Customer_Tier__c"]
-    },
-    implementationPlan: [
-      {
-        id: "field",
-        title: "Create Customer_Tier__c picklist",
-        detail: `Add a custom picklist field on ${objectApiName} with Gold, Silver, and Bronze values.`,
-        metadataType: "CustomField"
-      },
-      {
-        id: "fls",
-        title: "Leave field-level security unchanged",
-        detail: "Profiles and permission sets are out of scope and will not be modified.",
-        metadataType: "CustomField"
-      }
-    ],
-    metadataArtifacts: [
-      {
-        filePath: `force-app/main/default/objects/${objectApiName}/fields/Customer_Tier__c.field-meta.xml`,
-        metadataType: "CustomField",
-        before: null,
-        after: `<CustomField>\n  <fullName>Customer_Tier__c</fullName>\n  <label>Customer Tier</label>\n  <type>Picklist</type>\n  <valueSet>\n    <valueSetDefinition>\n      <value><fullName>Gold</fullName><default>false</default></value>\n      <value><fullName>Silver</fullName><default>false</default></value>\n      <value><fullName>Bronze</fullName><default>false</default></value>\n    </valueSetDefinition>\n  </valueSet>\n</CustomField>`
-      }
-    ],
-    validation: {
-      status: "passed",
-      issues: [
-        {
-          severity: "info",
-          message: "Mock validation only. No org was contacted.",
-          filePath: `force-app/main/default/objects/${objectApiName}/fields/Customer_Tier__c.field-meta.xml`
-        }
-      ]
-    },
-    deploymentStatus: "not_requested",
-    warning: null
-  };
+  return buildMockCustomFieldPlan(
+    parsed.data.requirement,
+    parsed.data.salesforceContext.objectApiName,
+    correlationId()
+  );
 }

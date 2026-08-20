@@ -1,0 +1,70 @@
+import type { ParsedCustomFieldRequest } from "@sfcopilot/shared";
+
+const API_VERSION = "62.0";
+
+export function toolingCustomFieldPayload(field: ParsedCustomFieldRequest): {
+  FullName: string;
+  Metadata: Record<string, unknown>;
+} {
+  const metadata: Record<string, unknown> = {
+    type: field.fieldType,
+    label: field.label,
+    required: false
+  };
+  if (field.fieldType === "Text") {
+    metadata.length = 255;
+  }
+  if (field.fieldType === "LongTextArea") {
+    metadata.length = 32768;
+    metadata.visibleLines = 5;
+  }
+  if (field.fieldType === "Number" || field.fieldType === "Currency" || field.fieldType === "Percent") {
+    metadata.precision = 18;
+    metadata.scale = field.fieldType === "Number" ? 0 : 2;
+  }
+  return {
+    FullName: `${field.objectApiName}.${field.apiName}`,
+    Metadata: metadata
+  };
+}
+
+export async function createCustomFieldWithSession(
+  instanceUrl: string,
+  sessionId: string,
+  field: ParsedCustomFieldRequest,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ id: string | null; message: string }> {
+  const response = await fetchImpl(
+    `${instanceUrl}/services/data/v${API_VERSION}/tooling/sobjects/CustomField/`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${sessionId}`
+      },
+      body: JSON.stringify(toolingCustomFieldPayload(field))
+    }
+  );
+  const raw: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const id =
+      raw && typeof raw === "object" && "id" in raw && typeof raw.id === "string" ? raw.id : null;
+    return {
+      id,
+      message: `Created ${field.objectApiName}.${field.apiName} in the org as the logged-in user.`
+    };
+  }
+  const message = extractSalesforceError(raw) || `Salesforce rejected the field (${response.status}).`;
+  throw new Error(message.slice(0, 400));
+}
+
+function extractSalesforceError(raw: unknown): string | null {
+  if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object" && "message" in raw[0]) {
+    const message = raw[0].message;
+    return typeof message === "string" ? message : null;
+  }
+  if (raw && typeof raw === "object" && "message" in raw && typeof raw.message === "string") {
+    return raw.message;
+  }
+  return null;
+}

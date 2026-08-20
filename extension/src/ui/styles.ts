@@ -316,6 +316,37 @@ button, textarea {
   color: #444;
 }
 
+.login-card {
+  pointer-events: auto;
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #c9c9c9;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.login-card h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.login-card input {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #aeaeae;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.login-card-ok {
+  background: #eef8f1;
+  border-color: #91c4a0;
+}
+
 @media (max-width: 480px) {
   .panel {
     width: calc(100vw - 16px);
