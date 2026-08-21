@@ -6,7 +6,17 @@
   "use strict";
 
   const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i];
-  const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i, /process failed/i, /we can't save this record/i, /the flow tried to update/i];
+  const FLOW_SIGNALS = [
+    /\bflow\b/i,
+    /FlowRuntime/i,
+    /flow fault/i,
+    /FLOW_ELEMENT/i,
+    /record-triggered flow/i,
+    /process failed/i,
+    /we can't save this record/i,
+    /the flow tried to update/i,
+    /because the\s+[''][^'']+['']\s+process/i,
+  ];
   const VALIDATION_SIGNALS = [
     /FIELD_CUSTOM_VALIDATION_EXCEPTION/i,
     /validation rule/i,
@@ -21,7 +31,7 @@
       failureType: "flow_malformed_id",
       label: "Flow Failed — Invalid ID Value",
       helpArticleKey: "FLOW_MALFORMED_ID",
-      requires: (s) => s.hasFlow && s.hasMalformedId,
+      requires: (s) => s.hasMalformedId && s.hasRealFlow && !s.hasInlineValidation,
       headline: (d) => `Flow "${d.flowName || "Unknown"}" failed — invalid ID in "${d.fieldName || "lookup field"}"`,
       narrative: (d) => `Process/Flow "${d.flowName || "unknown"}" tried to set an invalid Salesforce ID${d.invalidValue ? ` ("${d.invalidValue}")` : ""} on ${d.fieldName || "a lookup field"}. IDs must be 15/18 characters.`,
       quickChecks: (d) => [
@@ -145,11 +155,23 @@
 
   function detectSignals(text) {
     const has = (arr) => arr.some((p) => p.test(text));
+    const hasInlineValidation =
+      /we hit a snag/i.test(text) && /review the errors on this page/i.test(text);
+    const hasRealFlow =
+      /process failed/i.test(text) ||
+      /the flow tried to update/i.test(text) ||
+      /FlowRuntime/i.test(text) ||
+      /FLOW_ELEMENT/i.test(text) ||
+      /record-triggered flow/i.test(text) ||
+      /because the\s+[''][^'']+['']\s+process/i.test(text) ||
+      /\bflow\s+["'][^"']+["']/i.test(text);
     return {
       text,
-      hasFlow: has(FLOW_SIGNALS),
+      hasFlow: has(FLOW_SIGNALS) || hasRealFlow,
+      hasRealFlow,
+      hasInlineValidation,
       hasPermission: has(PERMISSION_SIGNALS),
-      hasValidation: has(VALIDATION_SIGNALS),
+      hasValidation: has(VALIDATION_SIGNALS) || hasInlineValidation,
       hasRequiredField: /required field|REQUIRED_FIELD_MISSING/i.test(text),
       hasApex: /apex|trigger|DMLException/i.test(text),
       hasMalformedId: /MALFORMED_ID|id value of incorrect type/i.test(text),
@@ -162,6 +184,15 @@
     const text = String(errorText || "");
     const signals = detectSignals(text);
     const details = extractDetails(text, objectHint);
+
+    // Inline Lightning validation UI beats stale MALFORMED_ID / flow noise on the page
+    if (signals.hasInlineValidation && !signals.hasRealFlow) {
+      const msg = details.validationMessage || details.validationRuleName;
+      const headline = msg
+        ? `Validation blocked the save: ${msg}`
+        : "Validation rule blocked the save.";
+      return makeValidationResult(headline, details, objectHint);
+    }
 
     for (const scenario of COMPOSITE_SCENARIOS) {
       if (!scenario.requires(signals)) continue;
@@ -208,10 +239,48 @@
         : details.validationRuleName
           ? `Validation rule "${details.validationRuleName}" blocked the save`
           : "Validation rule blocked the save.";
-      return makeSimple("VALIDATION", "validation", "Validation Rule", headline, details);
+      return makeValidationResult(headline, details, objectHint);
     }
 
     return makeSimple("UNKNOWN", "unknown", "Unknown Error", "Review debug logs for details.", details);
+  }
+
+  function makeValidationResult(headline, details, objectHint) {
+    const enriched = {
+      ...details,
+      objectName: details.objectName || objectHint || null,
+    };
+    const helpBase = HELP_ARTICLES.VALIDATION;
+    return {
+      classification: {
+        category: "VALIDATION",
+        failureType: "validation_rule",
+        label: "Validation Rule",
+        confidence: 0.9,
+      },
+      investigation: {
+        headline,
+        narrative: helpBase.summary,
+        ...enriched,
+        helpArticleKey: "VALIDATION",
+        suggestedActions: [
+          enriched.objectName
+            ? `Setup → Object Manager → ${enriched.objectName} → Validation Rules`
+            : "Setup → Object Manager → [Object] → Validation Rules",
+          "Match the on-page error message to a rule's Error Message text",
+          "Review the rule formula and field values on the record",
+        ],
+      },
+      helpArticle: {
+        ...helpBase,
+        ...enriched,
+        quickChecks: [
+          enriched.objectName
+            ? `Object Manager → ${enriched.objectName} → Validation Rules`
+            : "Open Validation Rules for the object being saved",
+        ],
+      },
+    };
   }
 
   function makeSimple(category, failureType, label, narrative, details) {

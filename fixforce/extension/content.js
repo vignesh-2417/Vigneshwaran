@@ -156,18 +156,84 @@
     return found;
   }
 
+  function pageShowsValidationUI() {
+    const text = getPageText();
+    return /we hit a snag/i.test(text) && /review the errors on this page/i.test(text);
+  }
+
+  function extractInlineValidationError() {
+    const candidates = [];
+
+    const popoverSelectors = [
+      "runtime_platform_actions-popover-error-panel",
+      "runtime_platform_actions-error-message",
+      "records-record-edit-errors",
+      "force-record-edit-errors",
+      "records-form-error-message",
+      ".slds-popover__body",
+      "[role='alertdialog']",
+      "[role='alert']",
+    ];
+
+    for (const selector of popoverSelectors) {
+      try {
+        document.querySelectorAll(selector).forEach((node) => {
+          const t = normalizeText(node.innerText || node.textContent);
+          if (
+            t.length > 10 &&
+            /we hit a snag|review the errors on this page/i.test(t)
+          ) {
+            candidates.push(t);
+          }
+        });
+      } catch (_) {}
+    }
+
+    const fromAnchors = extractFromAnchors(getPageText());
+    if (
+      fromAnchors &&
+      /we hit a snag|review the errors on this page/i.test(fromAnchors)
+    ) {
+      candidates.push(fromAnchors);
+    }
+
+    if (!candidates.length) return null;
+    return candidates.sort((a, b) => b.length - a.length)[0];
+  }
+
+  function scoreErrorCandidate(text) {
+    const t = normalizeText(text);
+    let score = 0;
+    if (/we hit a snag/i.test(t) && /review the errors on this page/i.test(t)) score += 1000;
+    if (/FIELD_CUSTOM_VALIDATION_EXCEPTION/i.test(t)) score += 900;
+    if (/INSUFFICIENT_ACCESS/i.test(t)) score += 700;
+    if (pageShowsValidationUI() && /MALFORMED_ID/i.test(t)) score -= 800;
+    if (pageShowsValidationUI() && /process failed/i.test(t)) score -= 400;
+    score += Math.min(t.length, 300);
+    return score;
+  }
+
   function scanForErrors() {
+    const inlineValidation = extractInlineValidationError();
+    if (inlineValidation) return inlineValidation;
+
     const fromSelectors = scanSelectorErrors();
     const fromPage = extractFromAnchors(getPageText());
     const all = [...fromSelectors];
     if (fromPage) all.push(fromPage);
     if (!all.length) return null;
-    return [...new Set(all)].sort((a, b) => b.length - a.length)[0];
+    return [...new Set(all)].sort((a, b) => scoreErrorCandidate(b) - scoreErrorCandidate(a))[0];
+  }
+
+  function buildPageContext() {
+    const parsed = parseUrl(window.location.href);
+    parsed.hasValidationUI = pageShowsValidationUI();
+    return parsed;
   }
 
   function buildPayload(errorText, analysis, orgContext) {
     const url = window.location.href;
-    const { object, recordId, context } = parseUrl(url);
+    const { object, recordId, context } = buildPageContext();
     return {
       errorText,
       object: object || "Unknown",
@@ -224,7 +290,7 @@
       window.FixForceOrgInvestigator?.mergeOrgIntoAnalysis &&
       window.FixForceIntelligence
     ) {
-      const parsed = parseUrl(window.location.href);
+      const parsed = buildPageContext();
       const base = FixForceIntelligence.analyzeLocally(errorText, parsed.context, parsed.object);
       mergedAnalysis = FixForceOrgInvestigator.mergeOrgIntoAnalysis(base, orgContext);
     }
@@ -252,7 +318,7 @@
     lastReportedError = errorText;
     lastReportedAt = Date.now();
 
-    const parsed = parseUrl(window.location.href);
+    const parsed = buildPageContext();
     const analysis = enrichAnalysisLocally(errorText, parsed);
 
     chrome.runtime.sendMessage(
@@ -315,7 +381,7 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === "REQUEST_CURRENT_ERROR") {
       const errorText = scanForErrors();
-      const parsed = parseUrl(window.location.href);
+      const parsed = buildPageContext();
       sendResponse({ errorText, url: location.href, ...parsed });
       if (msg.triggerAnalysis && errorText) reportError(errorText, true);
       return true;

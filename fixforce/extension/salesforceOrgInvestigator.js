@@ -84,7 +84,8 @@
     );
   }
 
-  function looksLikeValidation(errorText) {
+  function looksLikeValidation(errorText, pageContext = {}) {
+    if (pageContext.hasValidationUI) return true;
     return (
       /FIELD_CUSTOM_VALIDATION_EXCEPTION/i.test(errorText) ||
       /validation rule/i.test(errorText) ||
@@ -308,7 +309,7 @@
         (await resolveObjectApiName(pageContext, apiVersion)) || result.objectApiName;
       if (objectName) result.objectApiName = objectName;
 
-      if (looksLikeValidation(errorText)) {
+      if (looksLikeValidation(errorText, pageContext)) {
         if (objectName) {
           const rules = await getValidationRules(objectName, apiVersion);
           const matched = matchValidationRule(errorText, rules);
