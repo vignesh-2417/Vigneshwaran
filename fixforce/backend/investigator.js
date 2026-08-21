@@ -46,6 +46,7 @@ const VALIDATION_SIGNALS = [
   /validation rule/i,
   /validation failed/i,
   /violates.*validation/i,
+  /review the errors on this page/i,
 ];
 
 const COMPOSITE_SCENARIOS = [
@@ -210,6 +211,11 @@ const EXTRACTION_PATTERNS = {
   validationRuleName: [
     /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
     /validation rule\s+["']([^"']+)["']/i,
+    /review the errors on this page[.\s*]*([A-Za-z0-9_\s-]{3,80})/i,
+  ],
+  validationMessage: [
+    /review the errors on this page[.\s*]*(.{3,120})/i,
+    /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
   ],
   apexClass: [
     /Class\.([A-Za-z0-9_]+)/,
@@ -223,6 +229,14 @@ const EXTRACTION_PATTERNS = {
     /on\s+([A-Za-z0-9_]+)\s+object/i,
   ],
 };
+
+function trimValidationMsg(msg) {
+  if (!msg) return msg;
+  let out = String(msg).replace(/^[\s*•-]+/, "").trim();
+  const stop = out.match(/\b(View profile|Empty Cache|Setup|Object Manager|Named Credentials)\b/i);
+  if (stop && stop.index > 2) out = out.slice(0, stop.index).trim();
+  return out.slice(0, 120);
+}
 
 function firstMatch(text, patterns) {
   for (const pattern of patterns) {
@@ -242,7 +256,9 @@ function detectSignals(text) {
     hasRequiredField: /required field|REQUIRED_FIELD_MISSING|must be filled/i.test(text),
     hasApex: /apex|trigger|DMLException|CANNOT_INSERT_UPDATE/i.test(text),
     hasNullPointer: /null pointer|de-reference a null|no records matched/i.test(text),
-    hasIntegration: /callout|http request|external service|named credential|timeout/i.test(text),
+    hasIntegration:
+      /\bcallout\b|http request|named credential/i.test(text) &&
+      !/review the errors on this page/i.test(text),
     hasApproval: /approval process|submit for approval|approval request/i.test(text),
     hasEmail: /email alert|single email|messaging/i.test(text),
     hasSharing: /sharing|row cause|insufficient access on cross-reference/i.test(text),
@@ -265,6 +281,7 @@ function extractDetails(errorText, objectHint) {
     fieldName: firstMatch(text, EXTRACTION_PATTERNS.fieldName)?.trim(),
     invalidValue: firstMatch(text, EXTRACTION_PATTERNS.invalidValue),
     validationRuleName: firstMatch(text, EXTRACTION_PATTERNS.validationRuleName),
+    validationMessage: firstMatch(text, EXTRACTION_PATTERNS.validationMessage),
     apexClass: firstMatch(text, EXTRACTION_PATTERNS.apexClass),
     objectName: firstMatch(text, EXTRACTION_PATTERNS.objectName) || objectHint || null,
   };
@@ -340,7 +357,27 @@ function buildSingleCategoryInvestigation(signals, details, context) {
   let helpArticleKey = classification.category;
   let failureLayer = classification.failureType;
 
-  if (signals.hasIntegration) {
+  if (
+    (signals.hasValidation && !signals.hasFlow) ||
+    (/we hit a snag/i.test(signals.text) &&
+      /review the errors on this page/i.test(signals.text) &&
+      !/process failed/i.test(signals.text))
+  ) {
+    classification.category = "VALIDATION";
+    classification.failureType = "validation_rule";
+    classification.label = "Validation Rule";
+    const msg = trimValidationMsg(details.validationMessage || details.validationRuleName);
+    headline = msg
+      ? `Validation blocked the save: ${msg}`
+      : details.validationRuleName
+        ? `Validation rule "${details.validationRuleName}" blocked the save`
+        : "Validation rule blocked the save";
+    narrative =
+      "A validation rule on the object rejected the field values. Review the rule formula and update the record or adjust the rule.";
+    helpArticleKey = "VALIDATION";
+    failureLayer = "validation";
+    suggestedActions = HELP_ARTICLES.VALIDATION?.quickChecks || [];
+  } else if (signals.hasIntegration) {
     classification.category = "INTEGRATION";
     classification.failureType = "integration";
     classification.label = "Integration / Callout";
@@ -390,18 +427,6 @@ function buildSingleCategoryInvestigation(signals, details, context) {
     helpArticleKey = "LICENSE";
     failureLayer = "licensing";
     suggestedActions = HELP_ARTICLES.LICENSE?.quickChecks || [];
-  } else if (signals.hasValidation && !signals.hasFlow) {
-    classification.category = "VALIDATION";
-    classification.failureType = "validation_rule";
-    classification.label = "Validation Rule";
-    headline = details.validationRuleName
-      ? `Validation rule "${details.validationRuleName}" blocked the save`
-      : "Validation rule blocked the save";
-    narrative =
-      "A validation rule on the object rejected the field values. Review the rule formula and update the record or adjust the rule.";
-    helpArticleKey = "VALIDATION";
-    failureLayer = "validation";
-    suggestedActions = HELP_ARTICLES.VALIDATION?.quickChecks || [];
   } else if (signals.hasPermission && !signals.hasFlow && !signals.hasApex) {
     classification.category = "PERMISSION";
     classification.failureType = "permission";

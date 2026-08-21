@@ -167,6 +167,15 @@ function FF_test_TC18() {
   `);
 }
 
+// ─── TC19: Inline validation (CPQ / Lightning edit form) ─────────────────────
+function FF_test_TC19() {
+  return FF_injectError(`
+    <strong>We hit a snag.</strong><br>
+    Review the errors on this page.<br>
+    * TEST Fixforce
+  `);
+}
+
 console.log(
-  "[FixForce] DOM test helpers loaded. Run FF_test_TC01() … FF_test_TC18(), or FF_clearInjectedErrors()."
+  "[FixForce] DOM test helpers loaded. Run FF_test_TC01() … FF_test_TC19(), or FF_clearInjectedErrors()."
 );

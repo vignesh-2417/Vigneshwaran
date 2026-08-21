@@ -84,45 +84,126 @@
     return normalizeText(parts.join("\n"));
   }
 
+  function trimErrorNoise(text) {
+    const stopPatterns = [
+      /\bView profile\b/i,
+      /\bEmpty Cache\b/i,
+      /\bHard Reload\b/i,
+      /\bSetup\b/i,
+      /\bObject Manager\b/i,
+      /\bDeveloper Console\b/i,
+      /\bWork Item\b/i,
+      /\bSalesforce CPQ\b/i,
+      /\bApp Launcher\b/i,
+      /\bNamed Credentials\b/i,
+      /\bPermission Sets\b/i,
+    ];
+    let out = normalizeText(text);
+    for (const p of stopPatterns) {
+      const m = out.match(p);
+      if (m && m.index > 40) {
+        out = out.slice(0, m.index).trim();
+      }
+    }
+    return out.slice(0, 600);
+  }
+
+  function extractInlineValidationMessage(text) {
+    const t = normalizeText(text);
+    const m = t.match(
+      /(?:we hit a snag\.?\s*)?review the errors on this page[.\s*]*(.+?)(?:error id:|$)/i
+    );
+    if (m?.[1]) return trimErrorNoise(m[1]);
+    const snag = t.match(/we hit a snag[.\s]+(.{8,220})/i);
+    if (snag?.[1] && !/process failed/i.test(snag[1])) {
+      return trimErrorNoise(snag[1]);
+    }
+    return null;
+  }
+
   function extractFromAnchors(bodyText) {
     const text = normalizeText(bodyText);
     if (!text) return null;
 
+    const inlineMsg = extractInlineValidationMessage(text);
+    if (inlineMsg) {
+      return trimErrorNoise(
+        `We hit a snag. Review the errors on this page. ${inlineMsg}`
+      );
+    }
+
     const patterns = [
-      /We hit a snag[\s\S]{0,2200}?(?=Error ID:|$)/i,
-      /We can'?t save this record[\s\S]{0,2200}?(?=Error ID:|$)/i,
-      /Review the errors on this page[\s\S]{0,1500}/i,
-      /MALFORMED_ID[\s\S]{0,600}/i,
-      /FIELD_CUSTOM_VALIDATION_EXCEPTION[\s\S]{0,600}/i,
-      /INSUFFICIENT_ACCESS[\s\S]{0,600}/i,
-      /FUNCTIONALITY_NOT_ENABLED[\s\S]{0,600}/i,
-      /not enabled for your user license[\s\S]{0,400}/i,
-      /process failed[\s\S]{0,1200}/i,
-      /the flow tried to update[\s\S]{0,1200}/i,
+      /We hit a snag[\s\S]{0,400}?(?=Error ID:|View profile|Setup\b|Object Manager|$)/i,
+      /We can'?t save this record[\s\S]{0,400}?(?=Error ID:|View profile|Setup\b|Object Manager|$)/i,
+      /Review the errors on this page[\s\S]{0,280}?(?=Error ID:|View profile|Setup\b|Object Manager|$)/i,
+      /FIELD_CUSTOM_VALIDATION_EXCEPTION[\s\S]{0,400}/i,
+      /MALFORMED_ID[\s\S]{0,400}/i,
+      /INSUFFICIENT_ACCESS[\s\S]{0,400}/i,
+      /FUNCTIONALITY_NOT_ENABLED[\s\S]{0,400}/i,
+      /not enabled for your user license[\s\S]{0,300}/i,
+      /process failed[\s\S]{0,500}/i,
+      /the flow tried to update[\s\S]{0,500}/i,
     ];
 
     for (const p of patterns) {
       const m = text.match(p);
-      if (m) return normalizeText(m[0]);
+      if (m) return trimErrorNoise(m[0]);
     }
 
     for (const anchor of ERROR_ANCHORS) {
       const idx = text.toLowerCase().indexOf(anchor.toLowerCase());
       if (idx === -1) continue;
-      const chunk = text.slice(idx, idx + 2200);
+      const chunk = trimErrorNoise(text.slice(idx, idx + 400));
       if (chunk.length >= 15) return chunk;
     }
 
     return null;
   }
 
+  function scoreErrorCandidate(text) {
+    const t = normalizeText(text);
+    if (!t || t.length < 12) return -1;
+    let score = 0;
+    if (/we hit a snag/i.test(t)) score += 30;
+    if (/review the errors on this page/i.test(t)) score += 35;
+    if (/FIELD_CUSTOM_VALIDATION_EXCEPTION/i.test(t)) score += 40;
+    if (/process failed/i.test(t)) score += 20;
+    if (/MALFORMED_ID/i.test(t)) score += 25;
+    if (t.length > 900) score -= 40;
+    if (t.length > 500) score -= 20;
+    if (/\bView profile\b|\bObject Manager\b|\bNamed Credentials\b/i.test(t)) score -= 50;
+    if (/^[\s*•-]+[\w]/i.test(t) && t.length < 200) score += 15;
+    return score;
+  }
+
+  function pickBestError(candidates) {
+    const unique = [...new Set(candidates.map((c) => trimErrorNoise(c)).filter(Boolean))];
+    if (!unique.length) return null;
+    return unique.sort((a, b) => scoreErrorCandidate(b) - scoreErrorCandidate(a))[0];
+  }
+
   function scanSelectorErrors() {
     const found = [];
-    for (const selector of ERROR_SELECTORS) {
+    const prioritySelectors = [
+      "records-form-error-message",
+      "records-record-edit-errors",
+      "force-record-edit-errors",
+      "runtime_platform_actions-popover-error-panel",
+      "runtime_platform_actions-error-message",
+      "force-error-panel",
+      "lightning-messages",
+      "lightning-message",
+    ];
+    const allSelectors = [...new Set([...prioritySelectors, ...ERROR_SELECTORS])];
+
+    for (const selector of allSelectors) {
       try {
         document.querySelectorAll(selector).forEach((node) => {
-          const t = normalizeText(node.innerText || node.textContent);
-          if (t.length > 10) found.push(t);
+          if (node.closest?.("[data-fixforce-test]")) return;
+          const t = trimErrorNoise(node.innerText || node.textContent);
+          if (t.length > 10 && /snag|error|validation|failed|required|access|malformed/i.test(t)) {
+            found.push(t);
+          }
         });
       } catch (_) {}
     }
@@ -135,7 +216,7 @@
     const all = [...fromSelectors];
     if (fromPage) all.push(fromPage);
     if (!all.length) return null;
-    return [...new Set(all)].sort((a, b) => b.length - a.length)[0];
+    return pickBestError(all);
   }
 
   function buildPayload(errorText, analysis) {
@@ -241,5 +322,5 @@
     startWatching();
   }
 
-  console.log("[FixForce] v1.4 watching (extension alerts only)", location.hostname);
+  console.log("[FixForce] v1.4.1 watching (extension alerts only)", location.hostname);
 })();

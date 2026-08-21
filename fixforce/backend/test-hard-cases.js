@@ -175,7 +175,7 @@ const HARD_CASES = [
     context: "record_page",
     objectHint: "Opportunity",
     expectCategory: "VALIDATION",
-    expectHeadlineIncludes: "Validation rule",
+    expectHeadlineIncludes: "Validation blocked",
     minFixSteps: 2,
   },
   {
@@ -260,6 +260,17 @@ const HARD_CASES = [
     objectHint: null,
     expectCategory: "LICENSE",
     expectLabel: "License / Edition",
+    minFixSteps: 2,
+  },
+  {
+    id: "TC19",
+    name: "Inline validation (Review errors + rule message, page noise)",
+    text:
+      "We hit a snag. Review the errors on this page. * TEST Fixforce View profile Empty Cache and Hard Reload Setup Object Manager Named Credentials",
+    context: "record_page",
+    objectHint: "Account",
+    expectCategory: "VALIDATION",
+    expectHeadlineIncludes: "TEST Fixforce",
     minFixSteps: 2,
   },
 ];
