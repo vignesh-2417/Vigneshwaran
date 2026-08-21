@@ -16,7 +16,6 @@ const CATEGORY_META = {
   REQUIRED_FIELD: { label: "Required Field",   color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "📝" },
   NULL_POINTER:   { label: "Null Reference",   color: "#06b6d4", bg: "rgba(6,182,212,0.12)",   icon: "🚫" },
   UNKNOWN:        { label: "Unknown Error",    color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: "❓" },
-  LICENSE:        { label: "License / Edition", color: "#a855f7", bg: "rgba(168,85,247,0.12)",  icon: "🎫" },
 };
 
 // ─── DOM Refs ─────────────────────────────────────────────────────────────────
@@ -352,44 +351,16 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
   if (msg.type === "ERROR_DETECTED") {
     if (msg.data?.pendingAlert) showExtensionAlert(msg.data.pendingAlert);
-    if (msg.data?.analysis) {
-      showOnly($loading);
-      setStatus("loading", "Analyzing detected error…");
-    }
   }
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-function scanActiveTabOnOpen() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]?.id) return;
-    chrome.tabs.sendMessage(
-      tabs[0].id,
-      { type: "REQUEST_CURRENT_ERROR", triggerAnalysis: true },
-      (res) => {
-        if (chrome.runtime.lastError || !res?.errorText) return;
-        chrome.runtime.sendMessage({
-          type: "NEW_ERROR_DETECTED",
-          data: {
-            errorText: res.errorText,
-            url: res.url,
-            object: res.object || "Unknown",
-            recordId: res.recordId,
-            context: res.context || "record_page",
-            timestamp: new Date().toISOString(),
-          },
-        });
-        showOnly($loading);
-        setStatus("loading", "Analyzing detected error…");
-      }
-    );
-  });
-}
-
 loadState();
 loadPendingAlert();
-scanActiveTabOnOpen();
 
-// Poll every 2 s while popup is open to catch updates
-const pollInterval = setInterval(loadState, 2000);
-window.addEventListener("unload", () => clearInterval(pollInterval));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.latestAnalysis || changes.isLoading || changes.apiError) {
+    loadState();
+  }
+});

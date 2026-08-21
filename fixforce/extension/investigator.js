@@ -5,10 +5,9 @@
 (function (global) {
   "use strict";
 
-  const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i, /do not have edit access/i, /custom permission/i];
+  const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i];
   const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i, /process failed/i, /we can't save this record/i, /the flow tried to update/i];
-  const VALIDATION_SIGNALS = [/FIELD_CUSTOM_VALIDATION_EXCEPTION/i, /validation rule/i, /validation failed/i, /review the errors on this page/i];
-  const LICENSE_SIGNALS = [/FUNCTIONALITY_NOT_ENABLED/i, /user license/i, /license type/i, /not enabled for your user license/i, /license limit exceeded/i, /edition does not include/i, /feature is not available/i, /installed package requires/i];
+  const VALIDATION_SIGNALS = [/FIELD_CUSTOM_VALIDATION_EXCEPTION/i, /validation rule/i, /validation failed/i];
 
   const COMPOSITE_SCENARIOS = [
     {
@@ -94,21 +93,12 @@
     APEX_PERMISSION: { title: "Apex DML Permission Denied", summary: "Apex lacked permissions for DML.", url: "https://help.salesforce.com/s/articleView?id=sf.apex_sharing.htm&type=5", setupPath: "Setup → Apex + Profiles" },
     FLOW: { title: "Troubleshoot Flow Errors", summary: "Flow runtime failure.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
     FLOW_MALFORMED_ID: { title: "Flow Failed — Invalid Lookup ID", summary: "Flow assigned invalid text to a lookup field.", url: "https://help.salesforce.com/s/articleView?id=sf.flow_troubleshoot.htm&type=5", setupPath: "Setup → Flows → Debug" },
-    PERMISSION: { title: "User Permissions", summary: "Access denied — check profile, permission sets, FLS, and sharing.", url: "https://help.salesforce.com/s/articleView?id=sf.admin_userperms.htm&type=5", setupPath: "Setup → Users → Permission Sets" },
-    VALIDATION: { title: "Validation Rules", summary: "Validation blocked save — review rule formula and field values.", url: "https://help.salesforce.com/s/articleView?id=sf.customize_validations.htm&type=5", setupPath: "Setup → Validation Rules", quickChecks: ["Find the validation rule matching the on-page error message", "Review the rule formula in Setup → Object Manager", "Update field values or deactivate/adjust the rule"] },
-    LICENSE: { title: "User Licenses & Feature Availability", summary: "User license or org edition does not include this feature.", url: "https://help.salesforce.com/s/articleView?id=sf.users_license_types.htm&type=5", setupPath: "Setup → Users → License" },
+    PERMISSION: { title: "User Permissions", summary: "Access denied.", url: "https://help.salesforce.com/s/articleView?id=sf.admin_userperms.htm&type=5", setupPath: "Setup → Users" },
+    VALIDATION: { title: "Validation Rules", summary: "Validation blocked save.", url: "https://help.salesforce.com/s/articleView?id=sf.customize_validations.htm&type=5", setupPath: "Setup → Validation Rules" },
     INTEGRATION: { title: "HTTP Callouts", summary: "External callout failed.", url: "https://help.salesforce.com/s/articleView?id=sf.http_callouts.htm&type=5", setupPath: "Setup → Named Credentials" },
     APPROVAL: { title: "Approval Processes", summary: "Approval blocked action.", url: "https://help.salesforce.com/s/articleView?id=sf.approval_processes.htm&type=5", setupPath: "Setup → Approval Processes" },
     UNKNOWN: { title: "Debug Logs", summary: "Investigate with debug logs.", url: "https://help.salesforce.com/s/articleView?id=sf.code_debug_log.htm&type=5", setupPath: "Setup → Debug Logs" },
   };
-
-  function trimValidationMsg(msg) {
-    if (!msg) return msg;
-    let out = String(msg).replace(/^[\s*•-]+/, "").trim();
-    const stop = out.match(/\b(View profile|Empty Cache|Setup|Object Manager|Named Credentials)\b/i);
-    if (stop && stop.index > 2) out = out.slice(0, stop.index).trim();
-    return out.slice(0, 120);
-  }
 
   function firstMatch(text, patterns) {
     for (const p of patterns) {
@@ -122,16 +112,8 @@
     return {
       flowName: firstMatch(text, [/['']([^'']+)['']\s+process\s+failed/i, /because the\s+['']([^'']+)['']\s+process/i, /flow\s+["']([^"']+)["']/i]),
       flowElement: firstMatch(text, [/element\s+["']([^"']+)["']/i, /at element\s+["']?([A-Za-z0-9_]+)/i]),
-      fieldName: firstMatch(text, [/MALFORMED_ID:\s*([^:]+?):\s*id value/i, /field[s]?\s+["']([^"']+)["']/i, /cannot update the field\s+([A-Za-z0-9_]+)/i]),
+      fieldName: firstMatch(text, [/MALFORMED_ID:\s*([^:]+?):\s*id value/i, /field[s]?\s+["']([^"']+)["']/i]),
       invalidValue: firstMatch(text, [/id value of incorrect type:\s*(\S+)/i]),
-      validationRuleName: firstMatch(text, [
-        /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
-        /review the errors on this page[.\s*]*([A-Za-z0-9_\s-]{3,80})/i,
-      ]),
-      validationMessage: firstMatch(text, [
-        /review the errors on this page[.\s*]*(.{3,120})/i,
-        /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
-      ]),
       apexClass: firstMatch(text, [/Class\.([A-Za-z0-9_]+)/, /Trigger\.([A-Za-z0-9_]+)/]),
       objectName: firstMatch(text, [/object\s+["']([^"']+)["']/i]) || objectHint || null,
     };
@@ -147,9 +129,8 @@
       hasRequiredField: /required field|REQUIRED_FIELD_MISSING/i.test(text),
       hasApex: /apex|trigger|DMLException/i.test(text),
       hasMalformedId: /MALFORMED_ID|id value of incorrect type/i.test(text),
-      hasIntegration: /\bcallout\b|http request|named credential/i.test(text) && !/review the errors on this page/i.test(text),
+      hasIntegration: /callout|http request|named credential/i.test(text),
       hasApproval: /approval process|submit for approval/i.test(text),
-      hasLicense: LICENSE_SIGNALS.some((p) => p.test(text)),
     };
   }
 
@@ -183,45 +164,21 @@
       };
     }
 
-    if (signals.hasLicense) {
-      return makeSimple("LICENSE", "license", "License / Edition", "Feature or user license does not allow this action.", details);
+    if (signals.hasIntegration) {
+      return makeSimple("INTEGRATION", "integration", "Integration / Callout", "External callout failed.", details);
     }
-    if (
-      signals.hasValidation ||
-      (/we hit a snag/i.test(text) &&
-        /review the errors on this page/i.test(text) &&
-        !/process failed/i.test(text))
-    ) {
-      const msg = trimValidationMsg(details.validationMessage || details.validationRuleName);
-      const h = msg
-        ? `Validation blocked the save: ${msg}`
-        : details.validationRuleName
-          ? `Validation rule "${details.validationRuleName}" blocked the save`
-          : "Validation rule blocked the save";
-      return makeSimple("VALIDATION", "validation", "Validation Rule", h, {
-        ...details,
-        suggestedActions: [
-          "Open Setup → Object Manager → [Object] → Validation Rules",
-          "Find the active rule matching the error message on the page",
-          "Update field values or adjust the rule formula / error condition",
-        ],
-      });
+    if (signals.hasApproval) {
+      return makeSimple("APPROVAL", "approval", "Approval Process", "Approval process blocked the action.", details);
     }
     if (signals.hasFlow) {
       const h = details.flowName ? `Flow "${details.flowName}" failed` : "Flow runtime error";
       return makeSimple("FLOW", "flow", "Flow Error", h, details);
     }
     if (signals.hasPermission) {
-      const h = details.fieldName
-        ? `Insufficient access to field "${details.fieldName}"`
-        : "Insufficient permissions to perform this action";
-      return makeSimple("PERMISSION", "permission", "Permission / Access", h, details);
+      return makeSimple("PERMISSION", "permission", "Permission Error", "User lacks required access.", details);
     }
-    if (signals.hasIntegration) {
-      return makeSimple("INTEGRATION", "integration", "Integration / Callout", "External callout failed.", details);
-    }
-    if (signals.hasApproval) {
-      return makeSimple("APPROVAL", "approval", "Approval Process", "Approval process blocked the action.", details);
+    if (signals.hasValidation) {
+      return makeSimple("VALIDATION", "validation", "Validation Rule", "Validation rule blocked the save.", details);
     }
 
     return makeSimple("UNKNOWN", "unknown", "Unknown Error", "Review debug logs for details.", details);
@@ -230,7 +187,6 @@
   function makeSimple(category, failureType, label, narrative, details) {
     const key = category in HELP_ARTICLES ? category : "UNKNOWN";
     const helpBase = HELP_ARTICLES[key];
-    const steps = details.suggestedActions?.length ? details.suggestedActions : [];
     return {
       classification: { category, failureType, label, confidence: 0.6 },
       investigation: {
@@ -238,9 +194,9 @@
         narrative: helpBase.summary,
         ...details,
         helpArticleKey: key,
-        suggestedActions: steps,
+        suggestedActions: [],
       },
-      helpArticle: { ...helpBase, ...details, quickChecks: steps.length ? steps : helpBase.quickChecks },
+      helpArticle: { ...helpBase, ...details },
     };
   }
 

@@ -127,6 +127,15 @@ function showExtensionAlert(errorData, localItem) {
 }
 
 async function handleNewError(errorData) {
+  const { latestAnalysis } = await chrome.storage.local.get("latestAnalysis");
+  const isManual = errorData.context === "manual_scan";
+  const sameError =
+    latestAnalysis?.errorText && latestAnalysis.errorText === errorData.errorText;
+
+  if (!isManual && sameError) {
+    return;
+  }
+
   const localItem = buildItemFromLocal(errorData);
 
   // Save local analysis immediately so popup works without backend
