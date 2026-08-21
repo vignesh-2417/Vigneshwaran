@@ -8,3 +8,4 @@ export * from "./fieldTypes.js";
 export * from "./fieldParse.js";
 export * from "./mockPlan.js";
 export * from "./loginHost.js";
+export * from "./orgDeploy.js";

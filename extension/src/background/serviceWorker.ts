@@ -1,6 +1,7 @@
 import {
   AnalyzeRequestSchema,
   AnalyzeResponseSchema,
+  CreateCustomFieldPayloadSchema,
   MESSAGE_PROTOCOL_VERSION,
   SalesforceLoginPayloadSchema,
   assertAllowedSalesforceLoginHost,
@@ -11,6 +12,8 @@ import {
 import { DEFAULT_BACKEND_URL } from "../config.js";
 import { analyzeRequirementLocally } from "../api/localAnalyze.js";
 import { soapLogin } from "../salesforce/soapLogin.js";
+import { assertFieldReadyToCreate } from "../salesforce/assertFieldCreate.js";
+import { createCustomFieldWithSession } from "../salesforce/toolingField.js";
 
 const FETCH_TIMEOUT_MS = 8_000;
 const SESSION_KEY = "sfcopilot.sfSession";
@@ -167,6 +170,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             jsonResponse(request.requestId, false, undefined, {
               code: "INTERNAL_ERROR",
               message: messageText
+            })
+          );
+        });
+      return true;
+    }
+    if (request.type === "CREATE_CUSTOM_FIELD") {
+      void (async () => {
+        const session = await readSession();
+        if (!session) {
+          throw new Error("Sign in with Salesforce credentials before creating a field.");
+        }
+        const payload = CreateCustomFieldPayloadSchema.parse(request.payload);
+        const field = assertFieldReadyToCreate(
+          payload.requirement,
+          payload.objectApiName,
+          session.instanceUrl
+        );
+        const result = await createCustomFieldWithSession(
+          session.instanceUrl,
+          session.sessionId,
+          field
+        );
+        return {
+          fullName: `${field.objectApiName}.${field.apiName}`,
+          id: result.id,
+          created: result.created,
+          alreadyExists: result.alreadyExists,
+          message: result.message
+        };
+      })()
+        .then((payload) => sendResponse(jsonResponse(request.requestId, true, payload)))
+        .catch((error: unknown) => {
+          const messageText =
+            error instanceof Error ? error.message : "Field create failed";
+          sendResponse(
+            jsonResponse(request.requestId, false, undefined, {
+              code: "INTERNAL_ERROR",
+              message: messageText.slice(0, 400)
             })
           );
         });

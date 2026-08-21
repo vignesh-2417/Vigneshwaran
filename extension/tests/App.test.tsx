@@ -142,7 +142,23 @@ describe("assistant panel", () => {
     expect(await screen.findByRole("region", { name: "Implementation plan" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Metadata diff" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Validation results" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Approve plan" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Create field in this org" })).toBeEnabled();
+  });
+
+  it("creates the reviewed field in the org after ANALYZE", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    await signIn(user);
+    await user.click(screen.getByLabelText(/I understand Salesforce page context/));
+    await user.type(
+      screen.getByLabelText("Salesforce requirement"),
+      'Field data type: Currency. Create currency field "COPruppes" on Account object'
+    );
+    await user.click(screen.getByRole("button", { name: "Run ANALYZE" }));
+    await screen.findByRole("region", { name: "Metadata diff" });
+    await user.click(screen.getByRole("button", { name: "Create field in this org" }));
+    expect(await screen.findByText(/Created Account\.COPruppes__c|Created Account\.Field/i)).toBeInTheDocument();
   });
 
   it("lists every Salesforce field data type in the composer", async () => {

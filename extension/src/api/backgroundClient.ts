@@ -1,9 +1,12 @@
 import {
   AnalyzeRequestSchema,
   AnalyzeResponseSchema,
+  CreateCustomFieldPayloadSchema,
+  CreateCustomFieldResultSchema,
   MESSAGE_PROTOCOL_VERSION,
   parseExtensionResponse,
   type AnalyzeResponse,
+  type CreateCustomFieldResult,
   type SalesforceContext
 } from "@sfcopilot/shared";
 import { DEFAULT_BACKEND_URL } from "../config.js";
@@ -22,7 +25,13 @@ function isRecoverableTransportError(message: string | undefined): boolean {
 }
 
 async function send(
-  type: "ANALYZE_REQUIREMENT" | "LOGIN_SALESFORCE" | "LOGOUT_SALESFORCE" | "GET_AUTH_STATE" | "PING",
+  type:
+    | "ANALYZE_REQUIREMENT"
+    | "CREATE_CUSTOM_FIELD"
+    | "LOGIN_SALESFORCE"
+    | "LOGOUT_SALESFORCE"
+    | "GET_AUTH_STATE"
+    | "PING",
   payload?: unknown
 ): Promise<unknown> {
   const raw = await chrome.runtime.sendMessage({
@@ -54,6 +63,15 @@ export class BackgroundAssistantApi implements AssistantApi {
       }
       throw error;
     }
+  }
+
+  public async createCustomField(
+    requirement: string,
+    objectApiName: string | null
+  ): Promise<CreateCustomFieldResult> {
+    const payload = CreateCustomFieldPayloadSchema.parse({ requirement, objectApiName });
+    const result = await send("CREATE_CUSTOM_FIELD", payload);
+    return CreateCustomFieldResultSchema.parse(result);
   }
 
   public async getAuthState(): Promise<SalesforceAuthState> {

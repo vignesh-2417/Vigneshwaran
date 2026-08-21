@@ -24,7 +24,7 @@ interface AssistantPanelProps {
   onMinimize: () => void;
   onReset: () => void;
   onSubmit: () => void;
-  onApprovePlan: () => void;
+  onCreateField: () => void;
   onConsentChange: (value: boolean) => void;
 }
 
@@ -44,19 +44,20 @@ export function AssistantPanel({
   onMinimize,
   onReset,
   onSubmit,
-  onApprovePlan,
+  onCreateField,
   onConsentChange
 }: AssistantPanelProps) {
   const onFormSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSubmit();
   };
-  const canApprove =
+  const canCreate =
     Boolean(state.analysis) &&
     state.analysis?.blockedOperations.length === 0 &&
     state.analysis?.clarifyingQuestions.length === 0 &&
-    state.analysis?.operatingMode === "REVIEW" &&
-    !state.planApproved;
+    (state.analysis?.operatingMode === "REVIEW" || state.analysis?.operatingMode === "DEPLOY") &&
+    !state.planApproved &&
+    state.status !== "loading";
 
   return (
     <section
@@ -95,7 +96,8 @@ export function AssistantPanel({
             Correctness, security, explainability, and reviewability come before speed. Permission
             sets, profiles, sharing, login settings, credentials, production data, destructive
             changes, and unreviewed Apex callouts are never applied automatically. DEPLOY never
-            runs to production.
+            runs automatically and never targets production. After REVIEW, use Create field in this
+            org on a sandbox, scratch org, or Developer Edition.
           </div>
           <ol className="mode-rail" aria-label="Operating modes">
             {OPERATING_MODES.map((mode) => (
@@ -185,10 +187,10 @@ export function AssistantPanel({
               <button
                 type="button"
                 className="secondary"
-                disabled={!canApprove}
-                onClick={onApprovePlan}
+                disabled={!canCreate}
+                onClick={onCreateField}
               >
-                Approve plan
+                Create field in this org
               </button>
             </div>
           </form>
@@ -296,7 +298,10 @@ function AnalysisViews({
             </ul>
           </ReportBlock>
           {planApproved ? (
-            <p className="approval-note">Plan approved. DEPLOY is still a separate sandbox check-only step.</p>
+            <p className="approval-note">
+              Field create finished for this REVIEW package. Check Object Manager, then set FLS and
+              layouts. Production orgs are never updated.
+            </p>
           ) : null}
         </section>
       ) : null}

@@ -1,5 +1,9 @@
-import type { AnalyzeResponse, SalesforceContext } from "@sfcopilot/shared";
-import { AnalyzeResponseSchema } from "@sfcopilot/shared";
+import type {
+  AnalyzeResponse,
+  CreateCustomFieldResult,
+  SalesforceContext
+} from "@sfcopilot/shared";
+import { AnalyzeResponseSchema, parseCustomFieldRequirement } from "@sfcopilot/shared";
 
 export interface SalesforceAuthState {
   authenticated: boolean;
@@ -17,6 +21,10 @@ export interface SalesforceLoginInput {
 
 export interface AssistantApi {
   analyze(requirement: string, context: SalesforceContext): Promise<AnalyzeResponse>;
+  createCustomField(
+    requirement: string,
+    objectApiName: string | null
+  ): Promise<CreateCustomFieldResult>;
   getAuthState(): Promise<SalesforceAuthState>;
   login(input: SalesforceLoginInput): Promise<SalesforceAuthState>;
   logout(): Promise<void>;
@@ -34,6 +42,21 @@ export class MockAssistantApi implements AssistantApi {
 
   public analyze(requirement: string, context: SalesforceContext): Promise<AnalyzeResponse> {
     return this.impl(requirement, context);
+  }
+
+  public async createCustomField(
+    requirement: string,
+    objectApiName: string | null
+  ): Promise<CreateCustomFieldResult> {
+    const field = parseCustomFieldRequirement(requirement, objectApiName);
+    const fullName = `${field.objectApiName}.${field.apiName}`;
+    return {
+      fullName,
+      id: "00N000000000001",
+      created: true,
+      alreadyExists: false,
+      message: `Created ${fullName} in this org (mock).`
+    };
   }
 
   public async getAuthState(): Promise<SalesforceAuthState> {

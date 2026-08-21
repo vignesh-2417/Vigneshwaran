@@ -194,8 +194,28 @@ export const SalesforceLoginPayloadSchema = z.object({
 });
 export type SalesforceLoginPayload = z.infer<typeof SalesforceLoginPayloadSchema>;
 
+export const CreateCustomFieldPayloadSchema = z.object({
+  requirement: z
+    .string()
+    .trim()
+    .min(1, "Requirement cannot be empty")
+    .max(MAX_REQUIREMENT_LENGTH, "Requirement is too large"),
+  objectApiName: z.string().max(80).nullable()
+});
+export type CreateCustomFieldPayload = z.infer<typeof CreateCustomFieldPayloadSchema>;
+
+export const CreateCustomFieldResultSchema = z.object({
+  fullName: z.string().min(1).max(160),
+  id: z.string().max(80).nullable(),
+  created: z.boolean(),
+  alreadyExists: z.boolean(),
+  message: z.string().min(1).max(500)
+});
+export type CreateCustomFieldResult = z.infer<typeof CreateCustomFieldResultSchema>;
+
 export const ExtensionMessageTypeSchema = z.enum([
   "ANALYZE_REQUIREMENT",
+  "CREATE_CUSTOM_FIELD",
   "LOGIN_SALESFORCE",
   "LOGOUT_SALESFORCE",
   "GET_AUTH_STATE",

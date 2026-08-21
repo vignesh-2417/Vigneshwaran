@@ -141,12 +141,12 @@ function buildTaskReport(
     validationAndTestResults:
       "Static checks: DX source XML well-formed, no hard-coded IDs, no secrets, no destructiveChanges, no deploy commands. Salesforce CLI validation was not executed in this browser session.",
     deploymentPreview:
-      "Check-only deploy to a sandbox or scratch org only after REVIEW approval. Actual deploy is a separate, explicit user action. Production deploy is never automatic.",
+      "Field create is never automatic on ANALYZE. After you click Create field in this org, the Tooling API creates this CustomField in the signed-in sandbox, scratch, or Developer Edition org. Production create is blocked.",
     remainingManualSteps: [
-      "Approve this REVIEW package.",
-      "Run `sf project deploy start --dry-run` against a sandbox or scratch org.",
-      "Set FLS, layouts, and list views.",
-      "Only then consider a non-production deploy."
+      "Review the generated CustomField XML.",
+      "Click Create field in this org (sandbox, scratch, or Developer Edition only).",
+      "Set FLS, layouts, and list views in Setup.",
+      "Confirm the field on the object in Object Manager."
     ],
     knownLimitations: [
       "This assistant does not modify org files until PLAN is approved; GENERATE emits source text only.",
@@ -236,7 +236,7 @@ export function buildGovernedMetadataTask(
       {
         id: "deploy",
         title: "DEPLOY",
-        detail: "Not executed. Sandbox/scratch check-only only after approval. Never production automatically.",
+        detail: "Not run yet. After REVIEW, Create field in this org calls the Tooling API on sandbox, scratch, or Developer Edition only. Never production. Never automatic on ANALYZE.",
         metadataType: "CustomField"
       }
     ],

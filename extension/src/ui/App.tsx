@@ -144,7 +144,7 @@ export function CopilotApp({
           ? "Stopped. This request is security-sensitive. See the blocked-change report."
           : result.clarifyingQuestions.length > 0
             ? "ANALYZE needs more detail before PLAN."
-            : "ANALYZE through REVIEW completed. Source was generated. DEPLOY was not run.";
+            : "ANALYZE through REVIEW completed. Source was generated. Click Create field in this org to add it in this sandbox or Developer Edition.";
       setState((current) => ({
         ...current,
         status: "idle",
@@ -156,6 +156,55 @@ export function CopilotApp({
         ...current,
         status: "error",
         errorMessage: "The assistant could not complete analysis. Try again."
+      }));
+    }
+  };
+
+  const createField = async () => {
+    const text = state.lastRequirement.trim();
+    if (!text || !state.analysis) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        errorMessage: "Run ANALYZE and review the field XML before creating it in the org."
+      }));
+      return;
+    }
+    if (!auth.authenticated) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        errorMessage: "Sign in with Salesforce credentials before creating a field."
+      }));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      status: "loading",
+      errorMessage: null
+    }));
+    try {
+      const result = await api.createCustomField(text, getContext().objectApiName);
+      setState((current) => ({
+        ...current,
+        status: "idle",
+        planApproved: true,
+        analysis: current.analysis
+          ? {
+              ...current.analysis,
+              operatingMode: "DEPLOY",
+              deploymentStatus: result.created || result.alreadyExists ? "succeeded" : "failed",
+              warning: result.message
+            }
+          : current.analysis,
+        messages: [...current.messages, createMessage("assistant", result.message)]
+      }));
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        errorMessage:
+          error instanceof Error ? error.message : "Salesforce rejected the field create."
       }));
     }
   };
@@ -233,18 +282,8 @@ export function CopilotApp({
           onSubmit={() => {
             void submit();
           }}
-          onApprovePlan={() => {
-            setState((current) => ({
-              ...current,
-              planApproved: true,
-              messages: [
-                ...current.messages,
-                createMessage(
-                  "system",
-                  "Plan approved. DEPLOY is not automatic. Use a sandbox or scratch org with check-only validation first. Never production automatically."
-                )
-              ]
-            }));
+          onCreateField={() => {
+            void createField();
           }}
           onConsentChange={(value) =>
             setState((current) => ({ ...current, contextConsent: value }))

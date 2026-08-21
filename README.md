@@ -40,7 +40,7 @@ The huge “error” dump that starts with `var uN=Object.defineProperty` is the
 Fix:
 
 1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.7** and click **Reload**
+2. On `chrome://extensions`, confirm version **0.1.8** and click **Reload**
 3. Hard-refresh Lightning (`Ctrl+Shift+R`)
 
 Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
@@ -56,6 +56,6 @@ Do not load a parent folder, zip, or a stale copy that still has `content.js` st
 - **Run ANALYZE** produces source-format metadata and a nine-part report
 - Choose a **Field data type** (Text through External Lookup) or leave Infer from requirement
 - Picklist, formula, roll-up, and relationship fields ask clarifying questions when required extras are missing
-- **Approve plan** records human review; it does not deploy
-- DEPLOY is never automatic and never production
+- **Create field in this org** (after REVIEW) calls the Tooling API in the signed-in sandbox, scratch, or Developer Edition org
+- ANALYZE never creates the field by itself. Production orgs are blocked
 - If you are not signed in, Submit asks you to log in instead of showing `Failed to fetch`
