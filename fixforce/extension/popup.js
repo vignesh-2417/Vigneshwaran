@@ -29,6 +29,8 @@ const $statusText = document.getElementById("status-text");
 const $alertBanner = document.getElementById("extension-alert-banner");
 const $alertTitle = document.getElementById("extension-alert-title");
 const $alertBody = document.getElementById("extension-alert-body");
+const $orgSessionBanner = document.getElementById("org-session-banner");
+const $orgSetupLinks = document.getElementById("org-setup-links");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function showOnly(el) {
@@ -170,6 +172,43 @@ function renderHelpArticle(data) {
   }
 }
 
+function renderOrgContext(data) {
+  const org = data.orgContext || data.investigation?.orgContext;
+  if (!$orgSessionBanner) return;
+
+  if (org?.sessionAvailable) {
+    const userPart = org.user?.name ? ` as ${org.user.name}` : "";
+    $orgSessionBanner.textContent = `Org investigation${userPart} — matched metadata from your logged-in session.`;
+    $orgSessionBanner.classList.remove("hidden", "offline");
+  } else if (data.orgEnriched === false && org?.sessionError) {
+    $orgSessionBanner.textContent = `Org lookup unavailable (${org.sessionError}). Showing text-based analysis.`;
+    $orgSessionBanner.classList.remove("hidden");
+    $orgSessionBanner.classList.add("offline");
+  } else {
+    $orgSessionBanner.classList.add("hidden");
+    $orgSessionBanner.classList.remove("offline");
+  }
+
+  if (!$orgSetupLinks) return;
+  const links = data.setupLinks || org?.setupLinks || [];
+  $orgSetupLinks.innerHTML = "";
+  if (!links.length) {
+    $orgSetupLinks.classList.add("hidden");
+    return;
+  }
+  $orgSetupLinks.classList.remove("hidden");
+  links.forEach((link) => {
+    if (!link?.url) return;
+    const a = document.createElement("a");
+    a.className = "org-setup-link";
+    a.href = link.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = `↗ ${link.label}`;
+    $orgSetupLinks.appendChild(a);
+  });
+}
+
 function renderInvestigation(data) {
   const card = document.getElementById("investigation-card");
   const inv = data.investigation;
@@ -185,12 +224,17 @@ function renderInvestigation(data) {
   const meta = document.getElementById("investigation-meta");
   meta.innerHTML = "";
   const items = [];
+  if (inv.validationRuleName) items.push({ icon: "📋", label: inv.validationRuleName, accent: true });
   if (inv.flowName) items.push({ icon: "🔄", label: inv.flowName, accent: true });
   if (inv.flowElement) items.push({ icon: "📍", label: inv.flowElement });
   if (inv.fieldName) items.push({ icon: "📝", label: inv.fieldName });
   if (inv.objectName) items.push({ icon: "📦", label: inv.objectName });
+  if (inv.runningUser) items.push({ icon: "👤", label: inv.runningUser });
   if (inv.invalidValue) items.push({ icon: "⚠️", label: `"${inv.invalidValue}"` });
   if (inv.apexClass) items.push({ icon: "⚙️", label: inv.apexClass });
+  if (inv.validationMessage && !inv.validationRuleName) {
+    items.push({ icon: "💬", label: inv.validationMessage });
+  }
   items.forEach(({ icon, label, accent }) => {
     const pill = document.createElement("span");
     pill.className = "pill" + (accent ? " accent" : "");
@@ -216,6 +260,7 @@ function renderResult(data) {
   renderCategoryBadge(data.category);
   renderConfidence(data.confidence);
   renderContextPills(data);
+  renderOrgContext(data);
   renderInvestigation(data);
   renderFailureType(data);
   renderHelpArticle(data);

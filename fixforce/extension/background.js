@@ -46,6 +46,7 @@ async function callAnalyzeAPI(errorData) {
 
 function buildItemFromLocal(errorData) {
   const la = errorData.localAnalysis || {};
+  const inv = la.investigation || {};
   return {
     id: crypto.randomUUID(),
     timestamp: errorData.timestamp || new Date().toISOString(),
@@ -56,13 +57,38 @@ function buildItemFromLocal(errorData) {
     category: la.category || "UNKNOWN",
     failureLabel: la.failureLabel || "Salesforce Error",
     failureType: la.failureType || "unknown",
-    rootCause: la.rootCause || la.investigation?.narrative || "Error detected locally.",
-    fixSteps: la.fixSteps || [],
+    rootCause: la.rootCause || inv.narrative || "Error detected locally.",
+    fixSteps: la.fixSteps || inv.suggestedActions || [],
     confidence: la.confidence || 0.7,
-    investigation: la.investigation,
+    investigation: inv,
     helpArticle: la.helpArticle,
+    orgContext: errorData.orgContext || inv.orgContext || null,
     offline: true,
   };
+}
+
+function mergeEnrichment(existing, localAnalysis, orgContext) {
+  const la = localAnalysis || {};
+  const inv = la.investigation || existing.investigation || {};
+  const merged = {
+    ...existing,
+    category: la.category || existing.category,
+    failureLabel: la.failureLabel || existing.failureLabel,
+    failureType: la.failureType || existing.failureType,
+    rootCause: la.rootCause || inv.narrative || existing.rootCause,
+    fixSteps: la.fixSteps || inv.suggestedActions || existing.fixSteps,
+    confidence: Math.max(existing.confidence || 0, la.confidence || 0),
+    investigation: { ...existing.investigation, ...inv, orgContext },
+    helpArticle: la.helpArticle || existing.helpArticle,
+    orgContext: orgContext || existing.orgContext,
+    orgEnriched: true,
+  };
+
+  if (inv.headline) merged.investigation.headline = inv.headline;
+  if (orgContext?.setupLinks?.length) {
+    merged.setupLinks = orgContext.setupLinks;
+  }
+  return merged;
 }
 
 async function saveAnalysis(errorData, analysis) {
@@ -190,6 +216,33 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.notifications.clear(NOTIFICATION_ID);
     sendResponse({ dismissed: true });
     return false;
+  }
+
+  if (msg.type === "ENRICH_LATEST_ANALYSIS") {
+    (async () => {
+      const { latestAnalysis, isLoading } = await chrome.storage.local.get([
+        "latestAnalysis",
+        "isLoading",
+      ]);
+      if (!latestAnalysis || latestAnalysis.errorText !== msg.errorText) {
+        sendResponse({ skipped: true });
+        return;
+      }
+      const enriched = mergeEnrichment(
+        latestAnalysis,
+        msg.localAnalysis,
+        msg.orgContext
+      );
+      await chrome.storage.local.set({
+        latestAnalysis: enriched,
+        isLoading: isLoading === true ? isLoading : false,
+      });
+      chrome.runtime
+        .sendMessage({ type: "ANALYSIS_COMPLETE", data: enriched })
+        .catch(() => {});
+      sendResponse({ enriched: true });
+    })();
+    return true;
   }
 
   if (msg.type === "GET_LATEST") {

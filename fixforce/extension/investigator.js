@@ -7,7 +7,12 @@
 
   const PERMISSION_SIGNALS = [/INSUFFICIENT_ACCESS/i, /insufficient privileges/i, /insufficient access/i, /no access/i, /permission denied/i, /field-level security/i, /cannot update/i, /not authorized/i];
   const FLOW_SIGNALS = [/flow/i, /interview/i, /FlowRuntime/i, /flow fault/i, /FLOW_ELEMENT/i, /record-triggered flow/i, /process failed/i, /we can't save this record/i, /the flow tried to update/i];
-  const VALIDATION_SIGNALS = [/FIELD_CUSTOM_VALIDATION_EXCEPTION/i, /validation rule/i, /validation failed/i];
+  const VALIDATION_SIGNALS = [
+    /FIELD_CUSTOM_VALIDATION_EXCEPTION/i,
+    /validation rule/i,
+    /validation failed/i,
+    /review the errors on this page/i,
+  ];
 
   const COMPOSITE_SCENARIOS = [
     {
@@ -108,6 +113,14 @@
     return null;
   }
 
+  function trimValidationMsg(msg) {
+    if (!msg) return "";
+    let out = String(msg).replace(/^[\s*•\-]+/, "").trim();
+    const stop = out.match(/\b(View profile|Empty Cache|Setup|Object Manager)\b/i);
+    if (stop && stop.index > 2) out = out.slice(0, stop.index).trim();
+    return out.slice(0, 120);
+  }
+
   function extractDetails(text, objectHint) {
     return {
       flowName: firstMatch(text, [/['']([^'']+)['']\s+process\s+failed/i, /because the\s+['']([^'']+)['']\s+process/i, /flow\s+["']([^"']+)["']/i]),
@@ -116,6 +129,17 @@
       invalidValue: firstMatch(text, [/id value of incorrect type:\s*(\S+)/i]),
       apexClass: firstMatch(text, [/Class\.([A-Za-z0-9_]+)/, /Trigger\.([A-Za-z0-9_]+)/]),
       objectName: firstMatch(text, [/object\s+["']([^"']+)["']/i]) || objectHint || null,
+      validationRuleName: firstMatch(text, [
+        /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*([^:]+):/i,
+        /validation rule\s+["']([^"']+)["']/i,
+      ]),
+      validationMessage: trimValidationMsg(
+        firstMatch(text, [
+          /FIELD_CUSTOM_VALIDATION_EXCEPTION:\s*[^:]+:\s*([^\n\[]+)/i,
+          /review the errors on this page[.\s*]*(.{3,120})/i,
+        ]) ||
+          (text.match(/[*•]\s*([^\n*•]{2,120})/) || [])[1]
+      ),
     };
   }
 
@@ -178,7 +202,13 @@
       return makeSimple("PERMISSION", "permission", "Permission Error", "User lacks required access.", details);
     }
     if (signals.hasValidation) {
-      return makeSimple("VALIDATION", "validation", "Validation Rule", "Validation rule blocked the save.", details);
+      const msg = details.validationMessage || details.validationRuleName;
+      const headline = msg
+        ? `Validation blocked the save: ${msg}`
+        : details.validationRuleName
+          ? `Validation rule "${details.validationRuleName}" blocked the save`
+          : "Validation rule blocked the save.";
+      return makeSimple("VALIDATION", "validation", "Validation Rule", headline, details);
     }
 
     return makeSimple("UNKNOWN", "unknown", "Unknown Error", "Review debug logs for details.", details);

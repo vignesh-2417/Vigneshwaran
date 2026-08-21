@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "FixForce – Salesforce Error Analyzer",
-  "version": "1.4.0",
-  "description": "Detect Salesforce errors in real-time, analyze them with AI, and get instant root cause + fix steps.",
+  "version": "1.5.0",
+  "description": "Detect Salesforce errors in real-time, analyze with your org session, and get root cause + fix steps.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -23,7 +23,12 @@
   "content_scripts": [
     {
       "matches": ["*://*.salesforce.com/*", "*://*.force.com/*", "*://*.lightning.force.com/*"],
-      "js": ["investigator.js", "errorIntelligence.js", "content.js"],
+      "js": [
+        "investigator.js",
+        "errorIntelligence.js",
+        "salesforceOrgInvestigator.js",
+        "content.js"
+      ],
       "run_at": "document_end",
       "all_frames": false
     }

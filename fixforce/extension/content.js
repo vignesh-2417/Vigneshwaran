@@ -8,7 +8,6 @@
 
   const SCAN_DEBOUNCE_MS = 80;
   const POLL_INTERVAL_MS = 350;
-  const DEDUP_WINDOW_MS = 8000;
 
   const ERROR_ANCHORS = [
     "We hit a snag",
@@ -133,7 +132,7 @@
     return [...new Set(all)].sort((a, b) => b.length - a.length)[0];
   }
 
-  function buildPayload(errorText, analysis) {
+  function buildPayload(errorText, analysis, orgContext) {
     const url = window.location.href;
     const { object, recordId, context } = parseUrl(url);
     return {
@@ -143,6 +142,7 @@
       context,
       url,
       timestamp: new Date().toISOString(),
+      orgContext: orgContext || null,
       localAnalysis: analysis
         ? {
             category: analysis.classification?.category,
@@ -159,6 +159,55 @@
     };
   }
 
+  function enrichAnalysisLocally(errorText, parsed) {
+    let analysis = window.FixForceIntelligence
+      ? FixForceIntelligence.analyzeLocally(errorText, parsed.context, parsed.object)
+      : null;
+    if (analysis && window.FixForceOrgInvestigator?.mergeOrgIntoAnalysis) {
+      // no-op until org context arrives
+    }
+    return analysis;
+  }
+
+  async function fetchOrgContext(errorText, parsed) {
+    if (!window.FixForceOrgInvestigator?.investigateOrg) return null;
+    const timeout = FixForceOrgInvestigator.ENRICH_TIMEOUT_MS || 4000;
+    try {
+      return await Promise.race([
+        FixForceOrgInvestigator.investigateOrg(errorText, parsed),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeout)),
+      ]);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function sendOrgEnrichment(errorText, orgContext) {
+    if (!orgContext?.sessionAvailable) return;
+    let mergedAnalysis = null;
+    if (window.FixForceOrgInvestigator?.mergeOrgIntoAnalysis && window.FixForceIntelligence) {
+      const base = FixForceIntelligence.analyzeLocally(
+        errorText,
+        parseUrl(window.location.href).context,
+        parseUrl(window.location.href).object
+      );
+      mergedAnalysis = FixForceOrgInvestigator.mergeOrgIntoAnalysis(base, orgContext);
+    }
+    chrome.runtime.sendMessage(
+      {
+        type: "ENRICH_LATEST_ANALYSIS",
+        errorText,
+        orgContext,
+        localAnalysis: mergedAnalysis,
+      },
+      () => {
+        if (chrome.runtime.lastError) {
+          /* extension context may be unavailable */
+        }
+      }
+    );
+  }
+
   function reportError(errorText, force = false) {
     if (!force && errorText === lastReportedError) {
       return;
@@ -168,18 +217,20 @@
     lastReportedAt = Date.now();
 
     const parsed = parseUrl(window.location.href);
-    const analysis = window.FixForceIntelligence
-      ? FixForceIntelligence.analyzeLocally(errorText, parsed.context, parsed.object)
-      : null;
+    const analysis = enrichAnalysisLocally(errorText, parsed);
 
     chrome.runtime.sendMessage(
-      { type: "NEW_ERROR_DETECTED", data: buildPayload(errorText, analysis) },
+      { type: "NEW_ERROR_DETECTED", data: buildPayload(errorText, analysis, null) },
       () => {
         if (chrome.runtime.lastError) {
           /* extension context may be unavailable */
         }
       }
     );
+
+    fetchOrgContext(errorText, parsed).then((orgContext) => {
+      if (orgContext) sendOrgEnrichment(errorText, orgContext);
+    });
   }
 
   function runScan() {
@@ -241,5 +292,5 @@
     startWatching();
   }
 
-  console.log("[FixForce] v1.4 watching (extension alerts only)", location.hostname);
+  console.log("[FixForce] v1.5 watching (extension alerts + org session)", location.hostname);
 })();
