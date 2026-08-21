@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FixForce – Salesforce Error Analyzer",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Detect Salesforce errors in real-time, analyze with your org session, and get root cause + fix steps.",
   "icons": {
     "16": "icons/icon16.png",
@@ -35,6 +35,7 @@
   ],
   "permissions": [
     "activeTab",
+    "cookies",
     "notifications",
     "scripting",
     "storage",

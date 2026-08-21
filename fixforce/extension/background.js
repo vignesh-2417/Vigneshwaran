@@ -2,6 +2,8 @@
  * FixForce – background.js
  */
 
+import { sfSessionFetch } from "./sfSessionService.js";
+
 const API_BASE_URL = "http://localhost:3000";
 const MAX_HISTORY_ITEMS = 50;
 const NOTIFICATION_ID = "fixforce-latest-error";
@@ -190,7 +192,26 @@ async function handleNewError(errorData) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === "SF_SESSION_FETCH") {
+    (async () => {
+      try {
+        let tabId = sender.tab?.id;
+        let tabUrl = sender.tab?.url;
+        if (!tabId || !tabUrl) {
+          const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+          tabId = active?.id;
+          tabUrl = active?.url;
+        }
+        const data = await sfSessionFetch(tabId, tabUrl, msg.path);
+        sendResponse({ ok: true, data });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message || String(err) });
+      }
+    })();
+    return true;
+  }
+
   if (msg.type === "NEW_ERROR_DETECTED") {
     handleNewError(msg.data);
     sendResponse({ received: true });
@@ -228,11 +249,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ skipped: true });
         return;
       }
-      const enriched = mergeEnrichment(
-        latestAnalysis,
-        msg.localAnalysis,
-        msg.orgContext
-      );
+      const enriched = {
+        ...mergeEnrichment(latestAnalysis, msg.localAnalysis, msg.orgContext),
+        orgContext: msg.orgContext || latestAnalysis.orgContext,
+        orgEnriched: Boolean(msg.orgContext?.sessionAvailable && msg.localAnalysis),
+      };
       await chrome.storage.local.set({
         latestAnalysis: enriched,
         isLoading: isLoading === true ? isLoading : false,

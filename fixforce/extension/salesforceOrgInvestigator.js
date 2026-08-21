@@ -7,7 +7,7 @@
   "use strict";
 
   const CACHE_TTL_MS = 5 * 60 * 1000;
-  const ENRICH_TIMEOUT_MS = 4000;
+  const ENRICH_TIMEOUT_MS = 8000;
 
   let apiVersionCache = null;
   let apiVersionCachedAt = 0;
@@ -98,17 +98,45 @@
     );
   }
 
-  async function fetchJson(path, options = {}) {
-    const res = await fetch(path, {
-      credentials: "include",
-      headers: { Accept: "application/json", ...(options.headers || {}) },
-      ...options,
+  async function fetchJson(path) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "SF_SESSION_FETCH", path }, (resp) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!resp?.ok) {
+          reject(new Error(resp?.error || "Salesforce API request failed"));
+          return;
+        }
+        resolve(resp.data);
+      });
     });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Salesforce API ${res.status}: ${body.slice(0, 120)}`);
+  }
+
+  async function resolveObjectApiName(pageContext, apiVersion) {
+    if (pageContext.object && pageContext.object !== "Unknown") {
+      return pageContext.object;
     }
-    return res.json();
+    const recordId = pageContext.recordId;
+    if (!recordId || recordId.length < 15) return null;
+
+    const prefix = recordId.substring(0, 3);
+    try {
+      const q = [
+        "SELECT QualifiedApiName, Label, KeyPrefix",
+        "FROM EntityDefinition",
+        `WHERE KeyPrefix = '${escapeSoql(prefix)}'`,
+        "LIMIT 1",
+      ].join(" ");
+      const data = await fetchJson(
+        `/services/data/v${apiVersion}/tooling/query?q=${encodeURIComponent(q)}`
+      );
+      const row = data.records?.[0];
+      if (row?.QualifiedApiName) return row.QualifiedApiName;
+    } catch (_) {}
+
+    return null;
   }
 
   async function getApiVersion() {
@@ -127,14 +155,14 @@
   async function getCurrentUser(apiVersion) {
     try {
       const me = await fetchJson(`/services/data/v${apiVersion}/chatter/users/me`);
-      return {
-        id: me.id,
-        name: me.displayName || me.name,
-        username: me.username || me.email,
-      };
-    } catch (_) {
-      /* user identity is optional */
-    }
+      if (me?.id) {
+        return {
+          id: me.id,
+          name: me.displayName || me.name,
+          username: me.username || me.email,
+        };
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -144,20 +172,37 @@
     const cached = validationRulesCache.get(cacheKey);
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.rules;
 
-    const soql = [
-      "SELECT Id, ValidationName, ErrorMessage, ErrorDisplayField, Active,",
-      "EntityDefinition.QualifiedApiName, EntityDefinition.Label",
-      "FROM ValidationRule",
-      `WHERE EntityDefinition.QualifiedApiName = '${escapeSoql(objectApiName)}'`,
-      "AND Active = true",
-      "ORDER BY ValidationName",
-      "LIMIT 200",
-    ].join(" ");
+    const queries = [
+      [
+        "SELECT Id, ValidationName, ErrorMessage, ErrorDisplayField, Active,",
+        "EntityDefinition.QualifiedApiName, EntityDefinition.Label",
+        "FROM ValidationRule",
+        `WHERE EntityDefinition.QualifiedApiName = '${escapeSoql(objectApiName)}'`,
+        "AND Active = true",
+        "ORDER BY ValidationName",
+        "LIMIT 200",
+      ].join(" "),
+      [
+        "SELECT Id, ValidationName, ErrorMessage, ErrorDisplayField, Active, TableEnumOrId",
+        "FROM ValidationRule",
+        `WHERE TableEnumOrId = '${escapeSoql(objectApiName)}'`,
+        "AND Active = true",
+        "ORDER BY ValidationName",
+        "LIMIT 200",
+      ].join(" "),
+    ];
 
-    const data = await fetchJson(
-      `/services/data/v${apiVersion}/tooling/query?q=${encodeURIComponent(soql)}`
-    );
-    const rules = data.records || [];
+    let rules = [];
+    for (const soql of queries) {
+      try {
+        const data = await fetchJson(
+          `/services/data/v${apiVersion}/tooling/query?q=${encodeURIComponent(soql)}`
+        );
+        rules = data.records || [];
+        if (rules.length) break;
+      } catch (_) {}
+    }
+
     validationRulesCache.set(cacheKey, { at: Date.now(), rules });
     return rules;
   }
@@ -259,8 +304,11 @@
       const user = await getCurrentUser(apiVersion);
       if (user) result.user = user;
 
+      const objectName =
+        (await resolveObjectApiName(pageContext, apiVersion)) || result.objectApiName;
+      if (objectName) result.objectApiName = objectName;
+
       if (looksLikeValidation(errorText)) {
-        const objectName = result.objectApiName;
         if (objectName) {
           const rules = await getValidationRules(objectName, apiVersion);
           const matched = matchValidationRule(errorText, rules);
@@ -292,12 +340,22 @@
               );
             }
           } else if (rules.length) {
-            result.failureExplanation = `Validation failed on ${objectName}. ${rules.length} active rule(s) on this object — match page message to rule Error Message in Setup.`;
+            result.failureExplanation = `Validation failed on ${objectName}. ${rules.length} active rule(s) found in Object Manager — compare page message to each rule's Error Message.`;
             const listUrl = buildValidationSetupUrl(objectName);
             if (listUrl) {
-              result.setupLinks.push({ label: `View all ${objectName} validation rules`, url: listUrl });
+              result.setupLinks.push({
+                label: `Object Manager → ${objectName} → Validation Rules (${rules.length})`,
+                url: listUrl,
+              });
             }
+          } else {
+            result.failureExplanation = `No active validation rules returned for ${objectName}. Confirm API access and View Setup permission.`;
+            const listUrl = buildValidationSetupUrl(objectName);
+            if (listUrl) result.setupLinks.push({ label: `Open ${objectName} in Object Manager`, url: listUrl });
           }
+        } else {
+          result.failureExplanation =
+            "Could not determine object from URL. Open the Account (or target object) record page, then click Analyze Now.";
         }
       }
 

@@ -178,10 +178,15 @@ function renderOrgContext(data) {
 
   if (org?.sessionAvailable) {
     const userPart = org.user?.name ? ` as ${org.user.name}` : "";
-    $orgSessionBanner.textContent = `Org investigation${userPart} — matched metadata from your logged-in session.`;
+    const rulePart = org.validationRule?.apiName
+      ? ` — matched rule "${org.validationRule.apiName}" on ${org.validationRule.objectApiName || org.objectApiName || "object"}`
+      : org.objectApiName
+        ? ` — queried ${org.objectApiName} validation rules in Object Manager`
+        : "";
+    $orgSessionBanner.textContent = `Org investigation${userPart}${rulePart}.`;
     $orgSessionBanner.classList.remove("hidden", "offline");
-  } else if (data.orgEnriched === false && org?.sessionError) {
-    $orgSessionBanner.textContent = `Org lookup unavailable (${org.sessionError}). Showing text-based analysis.`;
+  } else if (org?.sessionError) {
+    $orgSessionBanner.textContent = `Org lookup failed: ${org.sessionError}`;
     $orgSessionBanner.classList.remove("hidden");
     $orgSessionBanner.classList.add("offline");
   } else {

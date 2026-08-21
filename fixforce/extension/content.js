@@ -55,22 +55,55 @@
   function parseUrl(url) {
     const result = { object: null, recordId: null, context: "unknown" };
     try {
-      const path = new URL(url).pathname;
-      const recordMatch = path.match(/\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15,18})\/view/);
+      const full = String(url || "");
+      const path = new URL(full).pathname;
+
+      const recordMatch =
+        path.match(/\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15,18})(?:\/|$)/) ||
+        full.match(/\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15,18})(?:\/|$)/);
       if (recordMatch) {
         result.object = recordMatch[1];
         result.recordId = recordMatch[2];
-        result.context = "record_page";
+        result.context = path.includes("/edit") ? "record_edit" : "record_page";
         return result;
       }
-      const objectMatch = path.match(/\/lightning\/o\/([^/]+)/);
+
+      const objectMatch =
+        path.match(/\/lightning\/o\/([^/]+)/) || full.match(/\/lightning\/o\/([^/]+)/);
       if (objectMatch) {
         result.object = objectMatch[1];
         result.context = path.includes("/new") ? "new_record" : "list_view";
       }
-      if (path.includes("/flow/")) result.context = "flow";
+      if (path.includes("/flow/") || full.includes("/flow/")) result.context = "flow";
     } catch (_) {}
+
+    if (!result.object) {
+      result.object = detectObjectFromPage();
+    }
+    if (!result.recordId) {
+      result.recordId = detectRecordIdFromPage();
+    }
     return result;
+  }
+
+  function detectObjectFromPage() {
+    const attrEl = document.querySelector("[data-object-api-name]");
+    if (attrEl?.getAttribute("data-object-api-name")) {
+      return attrEl.getAttribute("data-object-api-name");
+    }
+    const href = window.location.href;
+    const m = href.match(/\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15,18})/);
+    return m?.[1] || null;
+  }
+
+  function detectRecordIdFromPage() {
+    const href = window.location.href;
+    const m = href.match(/\/lightning\/r\/[^/]+\/([a-zA-Z0-9]{15,18})/);
+    if (m) return m[1];
+    const recEl = document.querySelector("[record-id]");
+    const rid = recEl?.getAttribute("record-id");
+    if (rid && /^[a-zA-Z0-9]{15,18}$/.test(rid)) return rid;
+    return null;
   }
 
   function getPageText() {
@@ -183,16 +216,19 @@
   }
 
   function sendOrgEnrichment(errorText, orgContext) {
-    if (!orgContext?.sessionAvailable) return;
+    if (!orgContext) return;
+
     let mergedAnalysis = null;
-    if (window.FixForceOrgInvestigator?.mergeOrgIntoAnalysis && window.FixForceIntelligence) {
-      const base = FixForceIntelligence.analyzeLocally(
-        errorText,
-        parseUrl(window.location.href).context,
-        parseUrl(window.location.href).object
-      );
+    if (
+      orgContext.sessionAvailable &&
+      window.FixForceOrgInvestigator?.mergeOrgIntoAnalysis &&
+      window.FixForceIntelligence
+    ) {
+      const parsed = parseUrl(window.location.href);
+      const base = FixForceIntelligence.analyzeLocally(errorText, parsed.context, parsed.object);
       mergedAnalysis = FixForceOrgInvestigator.mergeOrgIntoAnalysis(base, orgContext);
     }
+
     chrome.runtime.sendMessage(
       {
         type: "ENRICH_LATEST_ANALYSIS",
@@ -230,6 +266,12 @@
 
     fetchOrgContext(errorText, parsed).then((orgContext) => {
       if (orgContext) sendOrgEnrichment(errorText, orgContext);
+      else {
+        sendOrgEnrichment(errorText, {
+          sessionAvailable: false,
+          sessionError: "Org lookup timed out. Stay on the Salesforce tab and try Analyze Now.",
+        });
+      }
     });
   }
 
@@ -292,5 +334,5 @@
     startWatching();
   }
 
-  console.log("[FixForce] v1.5 watching (extension alerts + org session)", location.hostname);
+  console.log("[FixForce] v1.5.1 watching (org session via background)", location.hostname);
 })();
