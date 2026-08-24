@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Hide_On_Order_Form__c</fullName>
+    <description>True for bundle child products. Docusign Gen SuppressTableRow and the hideChildProducts parameter use this field to omit children from the Order Form.</description>
+    <formula>NOT(ISBLANK(Bundle_Parent__c))</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <inlineHelpText>Child products of a bundle are hidden on the generated Order Form.</inlineHelpText>
+    <label>Hide On Order Form</label>
+    <type>Checkbox</type>
+</CustomField>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Order_Form_Display_Name__c</fullName>
+    <description>Name printed on the Order Form: bundle name for package parents, otherwise the product name.</description>
+    <externalId>false</externalId>
+    <formula>IF(
+    Is_Bundle__c,
+    IF(ISBLANK(Bundle_Name__c), Name, Bundle_Name__c),
+    Name
+)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Order Form Display Name</label>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

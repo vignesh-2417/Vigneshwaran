@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Order_Form_Price__c</fullName>
+    <description>Price printed on the Order Form. Bundle parents include rolled-up child prices; hidden children are stamped at zero so visible lines sum to the document total.</description>
+    <inlineHelpText>Maintained automatically. Bundle price is the package total shown to the customer.</inlineHelpText>
+    <label>Order Form Price</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <type>Currency</type>
+</CustomField>
