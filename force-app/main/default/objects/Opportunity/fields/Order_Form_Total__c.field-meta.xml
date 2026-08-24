@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Order_Form_Total__c</fullName>
+    <description>Sum of visible Order Form line prices (bundles plus standalone products). Bind the Docusign Gen document total to this field so it matches the printed lines.</description>
+    <inlineHelpText>Document total for the Order Form. Equals the sum of visible bundle and product lines.</inlineHelpText>
+    <label>Order Form Total</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>2</scale>
+    <type>Currency</type>
+</CustomField>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Is_Bundle__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Marks this Opportunity Product as a bundle parent. Maintained automatically when child products reference it, and can be set manually.</description>
+    <inlineHelpText>When checked, this line appears on the Order Form as a single bundle row.</inlineHelpText>
+    <label>Is Bundle</label>
+    <type>Checkbox</type>
+</CustomField>

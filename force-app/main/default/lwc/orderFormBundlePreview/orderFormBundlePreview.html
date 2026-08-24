@@ -1,0 +1,63 @@
+<template>
+    <lightning-card title="Order Form (bundle view)" icon-name="standard:quotes">
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <p class="slds-m-bottom_small">
+                Bundles print as one line. Child products are hidden for Docusign Gen.
+            </p>
+            <lightning-button
+                variant="brand"
+                label="Prepare Order Form"
+                onclick={handlePrepare}
+                disabled={loading}
+            ></lightning-button>
+
+            <template if:true={loading}>
+                <lightning-spinner alternative-text="Preparing Order Form" size="small"></lightning-spinner>
+            </template>
+
+            <template if:true={error}>
+                <div class="slds-text-color_error slds-m-top_small">{error}</div>
+            </template>
+
+            <template if:true={hasLines}>
+                <table class="slds-table slds-table_cell-buffer slds-table_bordered slds-m-top_medium">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Qty</th>
+                            <th scope="col">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={model.visibleLines} for:item="line">
+                            <tr key={line.lineItemId}>
+                                <td>{line.name}</td>
+                                <td>{line.lineType}</td>
+                                <td>{line.quantity}</td>
+                                <td>
+                                    <lightning-formatted-number
+                                        value={line.price}
+                                        format-style="currency"
+                                        currency-code="USD"
+                                    ></lightning-formatted-number>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <p class="slds-m-top_small">
+                    <strong>Document total:</strong>
+                    <lightning-formatted-number
+                        value={formattedTotal}
+                        format-style="currency"
+                        currency-code="USD"
+                    ></lightning-formatted-number>
+                </p>
+                <p class="slds-text-body_small slds-m-top_x-small">
+                    Hidden bundle components: {hiddenCount}. Generate the document with Docusign Gen; no manual editing is required.
+                </p>
+            </template>
+        </div>
+    </lightning-card>
+</template>
