@@ -158,11 +158,28 @@ function buildTaskReport(
   };
 }
 
+export function isUnsupportedMetadataRequest(requirement: string): boolean {
+  const text = requirement.trim();
+  if (/\bvalidation\s+rule\b/i.test(text)) {
+    return true;
+  }
+  return /\bcustom\s+object\b/i.test(text) && !/\bfield\b/i.test(text);
+}
+
 export function buildGovernedMetadataTask(
   requirement: string,
   fallbackObject: string | null,
   correlationId: string
 ): AnalyzeSuccessResponse {
+  if (isUnsupportedMetadataRequest(requirement)) {
+    return buildAnalyzeModeResponse(correlationId, [
+      {
+        id: "unsupported-metadata",
+        prompt:
+          "This assistant currently generates CustomField metadata only. Custom objects and validation rules are not created in the org from this panel."
+      }
+    ]);
+  }
   const field = parseCustomFieldRequirement(requirement, fallbackObject);
   const filePath = `force-app/main/default/objects/${field.objectApiName}/fields/${field.apiName}.field-meta.xml`;
   const wantsFlow = /\bflow\b/i.test(requirement);

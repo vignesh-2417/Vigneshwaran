@@ -207,4 +207,14 @@ describe("buildMockCustomFieldPlan", () => {
     expect(plan.metadataArtifacts).toEqual([]);
     expect(plan.clarifyingQuestions.length).toBeGreaterThan(0);
   });
+
+  it("does not invent CustomObject XML for a custom object request", () => {
+    const plan = buildMockCustomFieldPlan(
+      "Create a custom object",
+      null,
+      "11111111-1111-4111-8111-111111111111"
+    );
+    expect(plan.operatingMode).toBe("ANALYZE");
+    expect(plan.metadataArtifacts).toEqual([]);
+  });
 });

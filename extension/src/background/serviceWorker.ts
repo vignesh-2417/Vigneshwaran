@@ -3,28 +3,27 @@ import {
   AnalyzeResponseSchema,
   CreateCustomFieldPayloadSchema,
   MESSAGE_PROTOCOL_VERSION,
-  SalesforceLoginPayloadSchema,
-  assertAllowedSalesforceLoginHost,
+  SalesforceConnectPayloadSchema,
   detectBlockedOperations,
   parseExtensionRequest,
   type ExtensionResponse
 } from "@sfcopilot/shared";
 import { DEFAULT_BACKEND_URL } from "../config.js";
 import { analyzeRequirementLocally } from "../api/localAnalyze.js";
-import { soapLogin } from "../salesforce/soapLogin.js";
 import { assertFieldReadyToCreate } from "../salesforce/assertFieldCreate.js";
-import { createCustomFieldWithSession } from "../salesforce/toolingField.js";
+import { createCustomFieldWithAccessToken } from "../salesforce/toolingField.js";
+import { authenticateWithSalesforce, mapOAuthFailure } from "../salesforce/oauth.js";
+import {
+  clearAuthState,
+  getAuthState,
+  getPublicAuthState,
+  logoutSalesforce,
+  setAuthState
+} from "../salesforce/authStore.js";
+import { SalesforceApiError } from "../salesforce/authTypes.js";
 
 const FETCH_TIMEOUT_MS = 8_000;
-const SESSION_KEY = "sfcopilot.sfSession";
 let mockAuthToken = "mock-session-token";
-let memorySession: StoredSalesforceSession | null = null;
-
-interface StoredSalesforceSession {
-  username: string;
-  instanceUrl: string;
-  sessionId: string;
-}
 
 function jsonResponse(
   requestId: string,
@@ -38,48 +37,6 @@ function jsonResponse(
     ok,
     ...(payload === undefined ? {} : { payload }),
     ...(error ? { error } : {})
-  };
-}
-
-async function readSession(): Promise<StoredSalesforceSession | null> {
-  const area = chrome.storage?.session;
-  if (!area) {
-    return memorySession;
-  }
-  const value = await area.get(SESSION_KEY);
-  const stored = value[SESSION_KEY];
-  if (
-    stored &&
-    typeof stored === "object" &&
-    "username" in stored &&
-    "instanceUrl" in stored &&
-    "sessionId" in stored
-  ) {
-    memorySession = stored as StoredSalesforceSession;
-    return memorySession;
-  }
-  return memorySession;
-}
-
-async function writeSession(session: StoredSalesforceSession | null): Promise<void> {
-  memorySession = session;
-  const area = chrome.storage?.session;
-  if (!area) {
-    return;
-  }
-  if (session) {
-    await area.set({ [SESSION_KEY]: session });
-    return;
-  }
-  await area.remove(SESSION_KEY);
-}
-
-function authPayload(session: StoredSalesforceSession | null) {
-  return {
-    authenticated: Boolean(session),
-    username: session?.username ?? null,
-    instanceUrl: session?.instanceUrl ?? null,
-    mode: session ? "session" : "anonymous"
   };
 }
 
@@ -114,44 +71,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return false;
     }
     if (request.type === "GET_AUTH_STATE") {
-      void readSession().then((session) => {
-        sendResponse(jsonResponse(request.requestId, true, authPayload(session)));
+      void getPublicAuthState().then((payload) => {
+        sendResponse(jsonResponse(request.requestId, true, payload));
       });
       return true;
     }
     if (request.type === "LOGOUT_SALESFORCE") {
-      void writeSession(null).then(() => {
-        sendResponse(jsonResponse(request.requestId, true, authPayload(null)));
+      void logoutSalesforce().then((payload) => {
+        sendResponse(jsonResponse(request.requestId, true, payload));
       });
       return true;
     }
-    if (request.type === "LOGIN_SALESFORCE") {
+    if (request.type === "CONNECT_SALESFORCE") {
       void (async () => {
-        const login = SalesforceLoginPayloadSchema.parse(request.payload);
-        const loginHost = assertAllowedSalesforceLoginHost(login.loginHost);
-        const session = await soapLogin(
-          loginHost,
-          login.username,
-          login.password,
-          login.securityToken
-        );
-        const stored = {
-          username: session.username,
-          instanceUrl: session.instanceUrl,
-          sessionId: session.sessionId
-        };
-        await writeSession(stored);
-        sendResponse(jsonResponse(request.requestId, true, authPayload(stored)));
-      })().catch((error: unknown) => {
-        const messageText =
-          error instanceof Error ? error.message : "Salesforce login failed";
-        sendResponse(
-          jsonResponse(request.requestId, false, undefined, {
-            code: "UNAUTHORIZED",
-            message: messageText.slice(0, 400)
-          })
-        );
-      });
+        const payload = SalesforceConnectPayloadSchema.parse(request.payload);
+        const auth = await authenticateWithSalesforce(payload.environment);
+        await setAuthState(auth);
+        return getPublicAuthState();
+      })()
+        .then((payload) => sendResponse(jsonResponse(request.requestId, true, payload)))
+        .catch((error: unknown) => {
+          sendResponse(
+            jsonResponse(request.requestId, false, undefined, {
+              code: "UNAUTHORIZED",
+              message: mapOAuthFailure(error)
+            })
+          );
+        });
       return true;
     }
     if (request.type === "ANALYZE_REQUIREMENT") {
@@ -177,21 +123,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (request.type === "CREATE_CUSTOM_FIELD") {
       void (async () => {
-        const session = await readSession();
-        if (!session) {
-          throw new Error("Sign in with Salesforce credentials before creating a field.");
+        const auth = await getAuthState();
+        if (!auth) {
+          throw new SalesforceApiError(
+            "expired",
+            "Your Salesforce session has expired."
+          );
         }
         const payload = CreateCustomFieldPayloadSchema.parse(request.payload);
         const field = assertFieldReadyToCreate(
           payload.requirement,
           payload.objectApiName,
-          session.instanceUrl
+          auth.instanceUrl
         );
-        const result = await createCustomFieldWithSession(
-          session.instanceUrl,
-          session.sessionId,
-          field
-        );
+        const result = await createCustomFieldWithAccessToken(auth, field);
         return {
           fullName: `${field.objectApiName}.${field.apiName}`,
           id: result.id,
@@ -201,12 +146,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         };
       })()
         .then((payload) => sendResponse(jsonResponse(request.requestId, true, payload)))
-        .catch((error: unknown) => {
+        .catch(async (error: unknown) => {
+          if (error instanceof SalesforceApiError && error.code === "expired") {
+            await clearAuthState();
+          }
           const messageText =
             error instanceof Error ? error.message : "Field create failed";
           sendResponse(
             jsonResponse(request.requestId, false, undefined, {
-              code: "INTERNAL_ERROR",
+              code: error instanceof SalesforceApiError ? error.code.toUpperCase() : "INTERNAL_ERROR",
               message: messageText.slice(0, 400)
             })
           );

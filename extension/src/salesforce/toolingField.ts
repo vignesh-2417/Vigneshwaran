@@ -1,6 +1,7 @@
 import { customFieldMetadataRecord, type ParsedCustomFieldRequest } from "@sfcopilot/shared";
-
-const API_VERSION = "62.0";
+import type { StoredSalesforceAuth } from "./authTypes.js";
+import { extractSalesforceError, salesforceApiRequest, throwIfSalesforceFailed } from "./salesforceApi.js";
+import { SalesforceApiError } from "./authTypes.js";
 
 export function toolingCustomFieldPayload(field: ParsedCustomFieldRequest): {
   FullName: string;
@@ -12,22 +13,19 @@ export function toolingCustomFieldPayload(field: ParsedCustomFieldRequest): {
   };
 }
 
-export async function createCustomFieldWithSession(
-  instanceUrl: string,
-  sessionId: string,
+export async function createCustomFieldWithAccessToken(
+  auth: StoredSalesforceAuth,
   field: ParsedCustomFieldRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<{ id: string | null; created: boolean; alreadyExists: boolean; message: string }> {
-  const response = await fetchImpl(
-    `${instanceUrl}/services/data/v${API_VERSION}/tooling/sobjects/CustomField/`,
+  const response = await salesforceApiRequest(
+    auth,
+    "/tooling/sobjects/CustomField/",
     {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${sessionId}`
-      },
       body: JSON.stringify(toolingCustomFieldPayload(field))
-    }
+    },
+    fetchImpl
   );
   const raw: unknown = await response.json().catch(() => null);
   if (response.ok) {
@@ -49,22 +47,18 @@ export async function createCustomFieldWithSession(
       message: `${field.objectApiName}.${field.apiName} already exists in this org. Open Object Manager → ${field.objectApiName} → Fields & Relationships.`
     };
   }
-  throw new Error(message.slice(0, 400));
+  if (response.status === 401 || response.status === 403) {
+    throwIfSalesforceFailed(response, raw);
+  }
+  if (response.status === 400) {
+    throw new SalesforceApiError("validation", message, 400);
+  }
+  throwIfSalesforceFailed(response, raw);
+  throw new SalesforceApiError("unknown", message, response.status);
 }
 
 export function isDuplicateCustomFieldError(message: string): boolean {
   return /already has a field|already exists|duplicate developer name|duplicate value/i.test(
     message
   );
-}
-
-function extractSalesforceError(raw: unknown): string | null {
-  if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object" && "message" in raw[0]) {
-    const message = raw[0].message;
-    return typeof message === "string" ? message : null;
-  }
-  if (raw && typeof raw === "object" && "message" in raw && typeof raw.message === "string") {
-    return raw.message;
-  }
-  return null;
 }

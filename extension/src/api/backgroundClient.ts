@@ -4,18 +4,16 @@ import {
   CreateCustomFieldPayloadSchema,
   CreateCustomFieldResultSchema,
   MESSAGE_PROTOCOL_VERSION,
+  SalesforceConnectPayloadSchema,
   parseExtensionResponse,
   type AnalyzeResponse,
   type CreateCustomFieldResult,
   type SalesforceContext
 } from "@sfcopilot/shared";
 import { DEFAULT_BACKEND_URL } from "../config.js";
-import type {
-  AssistantApi,
-  SalesforceAuthState,
-  SalesforceLoginInput
-} from "./assistantApi.js";
+import type { AssistantApi, SalesforceAuthState, SalesforceEnvironment } from "./assistantApi.js";
 import { analyzeRequirementLocally } from "./localAnalyze.js";
+import { ANONYMOUS_AUTH } from "../salesforce/authTypes.js";
 
 function isRecoverableTransportError(message: string | undefined): boolean {
   if (!message) {
@@ -28,7 +26,7 @@ async function send(
   type:
     | "ANALYZE_REQUIREMENT"
     | "CREATE_CUSTOM_FIELD"
-    | "LOGIN_SALESFORCE"
+    | "CONNECT_SALESFORCE"
     | "LOGOUT_SALESFORCE"
     | "GET_AUTH_STATE"
     | "PING",
@@ -76,12 +74,13 @@ export class BackgroundAssistantApi implements AssistantApi {
 
   public async getAuthState(): Promise<SalesforceAuthState> {
     const payload = await send("GET_AUTH_STATE");
-    return payload as SalesforceAuthState;
+    return (payload as SalesforceAuthState) ?? ANONYMOUS_AUTH;
   }
 
-  public async login(input: SalesforceLoginInput): Promise<SalesforceAuthState> {
-    const payload = await send("LOGIN_SALESFORCE", input);
-    return payload as SalesforceAuthState;
+  public async connect(environment: SalesforceEnvironment): Promise<SalesforceAuthState> {
+    const payload = SalesforceConnectPayloadSchema.parse({ environment });
+    const result = await send("CONNECT_SALESFORCE", payload);
+    return result as SalesforceAuthState;
   }
 
   public async logout(): Promise<void> {

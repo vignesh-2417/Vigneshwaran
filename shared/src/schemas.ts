@@ -186,13 +186,20 @@ export type AnalyzeResponse = z.infer<typeof AnalyzeResponseSchema>;
 
 export const MESSAGE_PROTOCOL_VERSION = 1 as const;
 
-export const SalesforceLoginPayloadSchema = z.object({
-  username: z.string().trim().min(1).max(255),
-  password: z.string().min(1).max(255),
-  securityToken: z.string().max(128).default(""),
-  loginHost: z.string().trim().min(1).max(255)
+export const SalesforceConnectPayloadSchema = z.object({
+  environment: z.enum(["production", "sandbox"])
 });
-export type SalesforceLoginPayload = z.infer<typeof SalesforceLoginPayloadSchema>;
+export type SalesforceConnectPayload = z.infer<typeof SalesforceConnectPayloadSchema>;
+
+export const PublicSalesforceAuthSchema = z.object({
+  authenticated: z.boolean(),
+  username: z.string().max(255).nullable(),
+  userId: z.string().max(80).nullable(),
+  orgId: z.string().max(80).nullable(),
+  instanceUrl: z.string().max(255).nullable(),
+  environment: z.enum(["production", "sandbox"]).nullable()
+});
+export type PublicSalesforceAuth = z.infer<typeof PublicSalesforceAuthSchema>;
 
 export const CreateCustomFieldPayloadSchema = z.object({
   requirement: z
@@ -216,7 +223,7 @@ export type CreateCustomFieldResult = z.infer<typeof CreateCustomFieldResultSche
 export const ExtensionMessageTypeSchema = z.enum([
   "ANALYZE_REQUIREMENT",
   "CREATE_CUSTOM_FIELD",
-  "LOGIN_SALESFORCE",
+  "CONNECT_SALESFORCE",
   "LOGOUT_SALESFORCE",
   "GET_AUTH_STATE",
   "PING"

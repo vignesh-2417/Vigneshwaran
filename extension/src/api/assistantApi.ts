@@ -4,20 +4,11 @@ import type {
   SalesforceContext
 } from "@sfcopilot/shared";
 import { AnalyzeResponseSchema, parseCustomFieldRequirement } from "@sfcopilot/shared";
+import type { PublicSalesforceAuthState, SalesforceEnvironment } from "../salesforce/authTypes.js";
+import { ANONYMOUS_AUTH } from "../salesforce/authTypes.js";
 
-export interface SalesforceAuthState {
-  authenticated: boolean;
-  username: string | null;
-  instanceUrl: string | null;
-  mode: "session" | "anonymous";
-}
-
-export interface SalesforceLoginInput {
-  username: string;
-  password: string;
-  securityToken: string;
-  loginHost: string;
-}
+export type SalesforceAuthState = PublicSalesforceAuthState;
+export type { SalesforceEnvironment };
 
 export interface AssistantApi {
   analyze(requirement: string, context: SalesforceContext): Promise<AnalyzeResponse>;
@@ -26,16 +17,9 @@ export interface AssistantApi {
     objectApiName: string | null
   ): Promise<CreateCustomFieldResult>;
   getAuthState(): Promise<SalesforceAuthState>;
-  login(input: SalesforceLoginInput): Promise<SalesforceAuthState>;
+  connect(environment: SalesforceEnvironment): Promise<SalesforceAuthState>;
   logout(): Promise<void>;
 }
-
-const ANONYMOUS_AUTH: SalesforceAuthState = {
-  authenticated: false,
-  username: null,
-  instanceUrl: null,
-  mode: "anonymous"
-};
 
 export class MockAssistantApi implements AssistantApi {
   public constructor(private readonly impl: AssistantApi["analyze"]) {}
@@ -63,12 +47,17 @@ export class MockAssistantApi implements AssistantApi {
     return ANONYMOUS_AUTH;
   }
 
-  public async login(input: SalesforceLoginInput): Promise<SalesforceAuthState> {
+  public async connect(environment: SalesforceEnvironment): Promise<SalesforceAuthState> {
     return {
       authenticated: true,
-      username: input.username,
-      instanceUrl: input.loginHost,
-      mode: "session"
+      username: "user@example.com",
+      userId: "005xx0000000001AAA",
+      orgId: "00Dxx0000000001EAA",
+      instanceUrl:
+        environment === "sandbox"
+          ? "https://example--full.sandbox.my.salesforce.com"
+          : "https://nteli56-dev-ed.my.salesforce.com",
+      environment
     };
   }
 

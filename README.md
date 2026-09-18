@@ -1,61 +1,91 @@
 # Salesforce Metadata Copilot
 
-Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. It prioritizes correctness, security, explainability, and reviewability. ANALYZE → PLAN → GENERATE → VALIDATE → REVIEW run in the popup. DEPLOY is never automatic and never targets production. Permission sets, profiles, sharing, login settings, credentials, production data, destructive changes, and unreviewed Apex callouts are blocked.
+Chrome MV3 extension that injects a floating assistant on Salesforce Lightning pages. Each user connects with **Salesforce OAuth 2.0 (Authorization Code + PKCE)**. ANALYZE → PLAN → GENERATE → VALIDATE → REVIEW still run in the panel. CustomField create uses the Tooling API with the OAuth access token. The assistant never asks for a Salesforce password or security token.
 
 ## Prerequisites
 
 - Node.js 20+
 - npm 10+
 - Chrome 120+
-- Optional backend: `npm run start -w backend` on `http://127.0.0.1:8787` (if it is down, the extension falls back to a local mock plan)
+- A Salesforce Connected App (public client, PKCE, no client secret in the extension)
+- Optional backend: `npm run start -w backend` on `http://127.0.0.1:8787`
 
-## Build the extension
+## Put your Client ID here
+
+Edit `extension/src/salesforce/oauthConfig.ts`:
+
+```ts
+export const SALESFORCE_CONFIG = {
+  clientId: "YOUR_CONNECTED_APP_CLIENT_ID",
+  productionLoginUrl: "https://login.salesforce.com",
+  sandboxLoginUrl: "https://test.salesforce.com"
+};
+```
+
+Replace `YOUR_CONNECTED_APP_CLIENT_ID` with the Connected App **Consumer Key**. Do not add a Consumer Secret to this repo.
+
+Then rebuild: `npm run build -w extension`.
+
+## Salesforce Connected App setup
+
+1. In Setup, search **App Manager** → **New Connected App**.
+2. Enable OAuth Settings.
+3. Callback URL (Chrome Identity). After you load the unpacked extension, copy the **Extension ID** from `chrome://extensions` (Developer mode). The callback is:
+
+```text
+https://<EXTENSION_ID>.chromiumapp.org/
+```
+
+Example: `https://abcdefghijklmnopqrstuvwxyzabcdef.chromiumapp.org/`
+
+4. Selected OAuth scopes:
+   - Access and manage your data (api)
+   - Access your basic information (id)
+   - Perform requests on your behalf at any time (refresh_token, offline_access)
+5. Require PKCE (Proof Key for Code Exchange). Do **not** require a client secret for this public Chrome extension.
+6. Save. If the org uses admin-approved users, add profiles/permission sets that should connect.
+
+## How to obtain the Chrome Extension ID
+
+1. `chrome://extensions`
+2. Enable Developer mode
+3. Load unpacked → select the `extension` folder
+4. Copy the ID shown on the card
+
+The ID is stable for that unpacked path. If you pack the extension, use the packed ID in the Connected App callback list (you can add both).
+
+## Build and load
 
 ```bash
 npm install
 npm run build -w extension
 ```
 
-That produces `extension/dist/content.js` and `extension/dist/background.js`, copies `process-shim.js` next to them, and writes `extension/dist/manifest.json`. The content bundle is verified to start with `/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:` and not contain `react.development.js`.
-
-## Load unpacked in Chrome
-
-**Either folder works after a successful build:**
-
 1. `chrome://extensions` → Developer mode → Load unpacked
-2. Select **`extension`** (recommended) or **`extension/dist`**
-3. On the extension card, click **Reload** after every rebuild
-4. Open a Lightning page (example: `/lightning/page/home`) and hard-refresh (`Ctrl+Shift+R`)
+2. Select **`extension`** (or `extension/dist` after copy-manifest)
+3. Confirm version **0.1.9**, Reload after every rebuild
+4. Open Lightning and hard-refresh (`Ctrl+Shift+R`)
 
-From **`extension`**, Chrome injects `process-shim.js` then `dist/content.js`. From **`extension/dist`**, it injects `process-shim.js` then `content.js`. The shim defines `process` before React so Lightning does not crash.
+## How to test
 
-### If you still see no icon
+**Production:** Environment = Production → Connect Salesforce → login.salesforce.com (SSO/MFA) → Authorize.
 
-The huge “error” dump that starts with `var uN=Object.defineProperty` is the **old crashing bundle** (React production + development, leftover `process.env.NODE_ENV`). Search `content.js` for `SF_METADATA_COPILOT_CONTENT_V2`. A good build starts with:
+**Sandbox:** Environment = Sandbox → Connect Salesforce → test.salesforce.com.
 
-```text
-/*SF_METADATA_COPILOT_CONTENT_V2*/var process={env:{NODE_ENV:"production"}};
-```
+**Two users:** Disconnect, then Connect Salesforce with a second username. The panel must show the new username and user id.
 
-Fix:
+**Disconnect:** Disconnect clears `chrome.storage.session` auth (access token, instance URL, user info) and returns to Connect Salesforce.
 
-1. Run `npm run build -w extension` in this repo
-2. On `chrome://extensions`, confirm version **0.1.8** and click **Reload**
-3. Hard-refresh Lightning (`Ctrl+Shift+R`)
+**Expired session:** After connect, if Salesforce returns 401 on Create Metadata, the panel shows “Your Salesforce session has expired.” and **Reconnect Salesforce**.
 
-Do not load a parent folder, zip, or a stale copy that still has `content.js` starting with `var uN=`.
+**Permission errors:** A user without Customize Application / Modify All Data (as required for CustomField Tooling create) should see “You don't have permission to perform this operation.”
 
-## Expected UI
+Field create still runs only on sandbox, scratch, or Developer Edition orgs after you click **Create Metadata**. Production orgs are blocked for Tooling create.
 
-- Orange neon lava circle, top-right (below the Lightning header)
-- A Salesforce username/password form appears next to the icon immediately
-- A lava-orange theme, with processing and the current prompt shown in the panel
-- After sign-in, an **OK** button dismisses the login card
-- Username, password, and optional security token stay in `chrome.storage.session` only (not in git)
-- After sign-in, a larger Inter-font review panel shows ANALYZE through REVIEW
-- **Run ANALYZE** produces source-format metadata and a nine-part report
-- Choose a **Field data type** (Text through External Lookup) or leave Infer from requirement
-- Picklist, formula, roll-up, and relationship fields ask clarifying questions when required extras are missing
-- **Create field in this org** (after REVIEW) calls the Tooling API in the signed-in sandbox, scratch, or Developer Edition org
-- ANALYZE never creates the field by itself. Production orgs are blocked
-- If you are not signed in, Submit asks you to log in instead of showing `Failed to fetch`
+## Security
+
+- OAuth tokens stay in the service worker and `chrome.storage.session`.
+- Content scripts receive username, user id, org id, instance URL, and environment only — not access tokens.
+- No SOAP `/services/Soap/u/62.0` login.
+- No passwords or security tokens.
+- No Connected App client secret in the extension.

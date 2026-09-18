@@ -25,7 +25,6 @@ describe("content script injection", () => {
         "button[aria-label='Salesforce Metadata Copilot']"
       );
       expect(button).not.toBeNull();
-      expect(host?.shadowRoot?.querySelector("#sfcopilot-username")).not.toBeNull();
     });
   });
 

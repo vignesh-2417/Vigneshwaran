@@ -1,28 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   applyFieldTypeHint,
-  deriveSalesforceLoginHost,
   detectSalesforceContext,
   type FieldCatalogId,
   type SalesforceContext
 } from "@sfcopilot/shared";
-import type { AssistantApi, SalesforceAuthState } from "../api/assistantApi.js";
+import type { AssistantApi, SalesforceAuthState, SalesforceEnvironment } from "../api/assistantApi.js";
 import { DEFAULT_ICON_POSITION, type IconPosition } from "../config.js";
 import { AssistantPanel } from "./AssistantPanel.js";
+import { AuthScreens } from "./AuthScreens.js";
 import {
   EMPTY_ASSISTANT_STATE,
   createMessage,
   type AssistantState
 } from "./assistantState.js";
 import { FloatingIcon } from "./FloatingIcon.js";
-import { LoginForm } from "./LoginForm.js";
-
-const ANONYMOUS: SalesforceAuthState = {
-  authenticated: false,
-  username: null,
-  instanceUrl: null,
-  mode: "anonymous"
-};
+import { ANONYMOUS_AUTH } from "../salesforce/authTypes.js";
 
 export interface CopilotAppProps {
   api: AssistantApi;
@@ -46,13 +39,12 @@ export function CopilotApp({
   const [requirement, setRequirement] = useState("");
   const [fieldTypeId, setFieldTypeId] = useState<FieldCatalogId | "infer">("infer");
   const [position, setPosition] = useState<IconPosition>(initialPosition);
-  const [auth, setAuth] = useState<SalesforceAuthState>(ANONYMOUS);
-  const [loginHost, setLoginHost] = useState(() =>
-    deriveSalesforceLoginHost(getContext().hostname)
-  );
+  const [auth, setAuth] = useState<SalesforceAuthState>(ANONYMOUS_AUTH);
+  const [environment, setEnvironment] = useState<SalesforceEnvironment>("production");
   const [loginStatus, setLoginStatus] = useState<"idle" | "loading" | "error">("idle");
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginAcknowledged, setLoginAcknowledged] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const context = useMemo(() => getContext(), [getContext, state.open]);
 
   useEffect(() => {
@@ -87,10 +79,48 @@ export function CopilotApp({
   const reset = () => {
     setState((current) => ({
       ...EMPTY_ASSISTANT_STATE,
-      open: current.open
+      open: current.open,
+      contextConsent: current.contextConsent
     }));
     setRequirement("");
     setFieldTypeId("infer");
+    setCreating(false);
+  };
+
+  const connect = () => {
+    setLoginStatus("loading");
+    setLoginError(null);
+    setSessionExpired(false);
+    void api
+      .connect(environment)
+      .then((next) => {
+        setAuth(next);
+        setLoginStatus("idle");
+        setState((current) => ({
+          ...current,
+          open: true,
+          messages: [
+            ...current.messages,
+            createMessage("system", "Connected with Salesforce OAuth. Enter a requirement to analyze.")
+          ]
+        }));
+      })
+      .catch((error: unknown) => {
+        setLoginStatus("error");
+        setLoginError(
+          error instanceof Error ? error.message : "Unable to connect to Salesforce."
+        );
+      });
+  };
+
+  const disconnect = () => {
+    void api.logout().then(() => {
+      setAuth(ANONYMOUS_AUTH);
+      setSessionExpired(false);
+      setLoginStatus("idle");
+      setLoginError(null);
+      reset();
+    });
   };
 
   const submit = async () => {
@@ -107,7 +137,7 @@ export function CopilotApp({
       setState((current) => ({
         ...current,
         status: "error",
-        errorMessage: "Sign in with Salesforce credentials before running ANALYZE."
+        errorMessage: "Connect Salesforce before running Analyze."
       }));
       return;
     }
@@ -124,6 +154,8 @@ export function CopilotApp({
       ...current,
       status: "loading",
       errorMessage: null,
+      analysis: null,
+      planApproved: false,
       messages: [...current.messages, createMessage("user", text)],
       lastRequirement: text
     }));
@@ -144,7 +176,7 @@ export function CopilotApp({
           ? "Stopped. This request is security-sensitive. See the blocked-change report."
           : result.clarifyingQuestions.length > 0
             ? "ANALYZE needs more detail before PLAN."
-            : "ANALYZE through REVIEW completed. Source was generated. Click Create field in this org to add it in this sandbox or Developer Edition.";
+            : "ANALYZE through REVIEW completed. Review the metadata preview, then Create Metadata.";
       setState((current) => ({
         ...current,
         status: "idle",
@@ -166,7 +198,7 @@ export function CopilotApp({
       setState((current) => ({
         ...current,
         status: "error",
-        errorMessage: "Run ANALYZE and review the field XML before creating it in the org."
+        errorMessage: "Run Analyze and review the field preview before creating it in the org."
       }));
       return;
     }
@@ -174,10 +206,11 @@ export function CopilotApp({
       setState((current) => ({
         ...current,
         status: "error",
-        errorMessage: "Sign in with Salesforce credentials before creating a field."
+        errorMessage: "Connect Salesforce before creating a field."
       }));
       return;
     }
+    setCreating(true);
     setState((current) => ({
       ...current,
       status: "loading",
@@ -185,6 +218,7 @@ export function CopilotApp({
     }));
     try {
       const result = await api.createCustomField(text, getContext().objectApiName);
+      setCreating(false);
       setState((current) => ({
         ...current,
         status: "idle",
@@ -200,50 +234,21 @@ export function CopilotApp({
         messages: [...current.messages, createMessage("assistant", result.message)]
       }));
     } catch (error) {
+      setCreating(false);
+      const message =
+        error instanceof Error ? error.message : "Salesforce rejected the field create.";
+      const expired = /session has expired/i.test(message);
+      if (expired) {
+        setAuth(ANONYMOUS_AUTH);
+        setSessionExpired(true);
+      }
       setState((current) => ({
         ...current,
         status: "error",
-        errorMessage:
-          error instanceof Error ? error.message : "Salesforce rejected the field create."
+        errorMessage: message
       }));
     }
   };
-
-  const loginForm = (
-    <LoginForm
-      auth={auth}
-      loginHost={loginHost}
-      status={loginStatus}
-      errorMessage={loginError}
-      onLoginHostChange={setLoginHost}
-      onLogin={(input) => {
-        setLoginStatus("loading");
-        setLoginError(null);
-        void api
-          .login(input)
-          .then((next) => {
-            setAuth(next);
-            setLoginStatus("idle");
-            setLoginAcknowledged(false);
-          })
-          .catch((error: unknown) => {
-            setLoginStatus("error");
-            setLoginError(error instanceof Error ? error.message : "Salesforce login failed.");
-          });
-      }}
-      onAcknowledge={() => {
-        setLoginAcknowledged(true);
-        setState((current) => ({
-          ...current,
-          open: true,
-          messages: [
-            ...current.messages,
-            createMessage("system", "Signed in. Enter a requirement to process it as this user.")
-          ]
-        }));
-      }}
-    />
-  );
 
   return (
     <div className="copilot-root">
@@ -254,26 +259,23 @@ export function CopilotApp({
         onToggle={toggle}
         onPositionChange={updatePosition}
       />
-      {loginAcknowledged ? null : (
-        <div
-          className="login-float"
-          style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
-        >
-          {loginForm}
-        </div>
-      )}
-      {state.open ? (
+      {state.open && auth.authenticated ? (
         <AssistantPanel
           state={state}
+          auth={auth}
           targetOrg={context.hostname}
-          signedInAs={auth.username}
           top={position.top + 64}
           right={position.right}
           requirement={requirement}
           fieldTypeId={fieldTypeId}
-          authenticated={auth.authenticated}
+          sessionExpired={sessionExpired}
+          creating={creating}
           onRequirementChange={setRequirement}
           onFieldTypeChange={setFieldTypeId}
+          onQuickAction={(text, type) => {
+            setRequirement(text);
+            setFieldTypeId(type);
+          }}
           onClose={close}
           onMinimize={() =>
             setState((current) => ({ ...current, minimized: !current.minimized }))
@@ -285,10 +287,43 @@ export function CopilotApp({
           onCreateField={() => {
             void createField();
           }}
+          onCancelPreview={reset}
+          onCreateAnother={reset}
           onConsentChange={(value) =>
             setState((current) => ({ ...current, contextConsent: value }))
           }
+          onDisconnect={disconnect}
+          onOpenSalesforce={() => {
+            if (auth.instanceUrl) {
+              window.open(auth.instanceUrl, "_blank", "noopener,noreferrer");
+            }
+          }}
+          onReconnect={connect}
         />
+      ) : state.open ? (
+        <section
+          className="panel panel-wide"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sfcopilot-title"
+          style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
+        >
+          <header className="panel-header">
+            <h1 className="panel-title" id="sfcopilot-title">
+              Salesforce Metadata Copilot
+            </h1>
+            <button type="button" className="icon-action" aria-label="Close assistant" onClick={close}>
+              Close
+            </button>
+          </header>
+          <AuthScreens
+            environment={environment}
+            status={loginStatus}
+            errorMessage={loginError}
+            onEnvironmentChange={setEnvironment}
+            onConnect={connect}
+          />
+        </section>
       ) : null}
     </div>
   );
