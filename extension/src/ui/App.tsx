@@ -45,6 +45,7 @@ export function CopilotApp({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [connectHidden, setConnectHidden] = useState(false);
   const context = useMemo(() => getContext(), [getContext, state.open]);
 
   useEffect(() => {
@@ -55,13 +56,19 @@ export function CopilotApp({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && state.open) {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (!auth.authenticated) {
+        setConnectHidden(true);
+      }
+      if (state.open) {
         setState((current) => ({ ...current, open: false }));
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state.open]);
+  }, [state.open, auth.authenticated]);
 
   const updatePosition = (top: number, right: number) => {
     const next = { top, right };
@@ -69,13 +76,21 @@ export function CopilotApp({
     onPositionChange?.(next);
   };
 
-  const close = () => setState((current) => ({ ...current, open: false }));
-  const toggle = () =>
+  const close = () => {
+    setConnectHidden(true);
+    setState((current) => ({ ...current, open: false }));
+  };
+  const toggle = () => {
+    if (!auth.authenticated) {
+      setConnectHidden(false);
+      return;
+    }
     setState((current) => ({
       ...current,
       open: !current.open,
       minimized: current.open ? current.minimized : false
     }));
+  };
   const reset = () => {
     setState((current) => ({
       ...EMPTY_ASSISTANT_STATE,
@@ -259,6 +274,32 @@ export function CopilotApp({
         onToggle={toggle}
         onPositionChange={updatePosition}
       />
+      {!auth.authenticated && !connectHidden ? (
+        <section
+          className="panel panel-wide connect-float"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sfcopilot-title"
+          data-auth-mode="oauth-pkce"
+          style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
+        >
+          <header className="panel-header">
+            <h1 className="panel-title" id="sfcopilot-title">
+              Salesforce Metadata Copilot
+            </h1>
+            <button type="button" className="icon-action" aria-label="Close assistant" onClick={close}>
+              Close
+            </button>
+          </header>
+          <AuthScreens
+            environment={environment}
+            status={loginStatus}
+            errorMessage={loginError}
+            onEnvironmentChange={setEnvironment}
+            onConnect={connect}
+          />
+        </section>
+      ) : null}
       {state.open && auth.authenticated ? (
         <AssistantPanel
           state={state}
@@ -300,30 +341,6 @@ export function CopilotApp({
           }}
           onReconnect={connect}
         />
-      ) : state.open ? (
-        <section
-          className="panel panel-wide"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="sfcopilot-title"
-          style={{ top: `${position.top + 64}px`, right: `${position.right}px` }}
-        >
-          <header className="panel-header">
-            <h1 className="panel-title" id="sfcopilot-title">
-              Salesforce Metadata Copilot
-            </h1>
-            <button type="button" className="icon-action" aria-label="Close assistant" onClick={close}>
-              Close
-            </button>
-          </header>
-          <AuthScreens
-            environment={environment}
-            status={loginStatus}
-            errorMessage={loginError}
-            onEnvironmentChange={setEnvironment}
-            onConnect={connect}
-          />
-        </section>
       ) : null}
     </div>
   );

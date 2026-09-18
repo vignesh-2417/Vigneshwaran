@@ -30,20 +30,17 @@ Then rebuild: `npm run build -w extension`.
 
 1. In Setup, search **App Manager** → **New Connected App**.
 2. Enable OAuth Settings.
-3. Callback URL (Chrome Identity). After you load the unpacked extension, copy the **Extension ID** from `chrome://extensions` (Developer mode). The callback is:
+3. Callback URL must match Chrome Identity **exactly**:
 
 ```text
-https://<EXTENSION_ID>.chromiumapp.org/
+https://<EXTENSION_ID>.chromiumapp.org/oauth2
 ```
 
-Example: `https://abcdefghijklmnopqrstuvwxyzabcdef.chromiumapp.org/`
+That is `chrome.identity.getRedirectURL("oauth2")`. Do not use login.salesforce.com as the extension callback.
 
-4. Selected OAuth scopes:
-   - Access and manage your data (api)
-   - Access your basic information (id)
-   - Perform requests on your behalf at any time (refresh_token, offline_access)
-5. Require PKCE (Proof Key for Code Exchange). Do **not** require a client secret for this public Chrome extension.
-6. Save. If the org uses admin-approved users, add profiles/permission sets that should connect.
+4. Create an **External Client App** (or Connected App) with OAuth enabled, Authorization Code + PKCE, and no client secret in this extension.
+5. OAuth scopes: **api**, **id**, **refresh_token / offline_access** (needed for Tooling API).
+6. Save, then rebuild this extension.
 
 ## How to obtain the Chrome Extension ID
 
@@ -63,7 +60,7 @@ npm run build -w extension
 
 1. `chrome://extensions` → Developer mode → Load unpacked
 2. Select **`extension`** (or `extension/dist` after copy-manifest)
-3. Confirm version **0.1.9**, Reload after every rebuild
+3. Confirm version **0.2.0**. If you still see “Salesforce login / username / password / security token”, you are on a stale unpacked folder — Remove the old extension, rebuild, Load unpacked again.
 4. Open Lightning and hard-refresh (`Ctrl+Shift+R`)
 
 ## How to test

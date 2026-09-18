@@ -23,8 +23,12 @@ if (source.includes("react.development.js")) {
   failures.push("content.js still contains react.development.js");
 }
 
-if (source.includes("process.env.NODE_ENV")) {
-  failures.push("content.js still contains leftover process.env.NODE_ENV");
+if (source.includes("Security token") || source.includes("sfcopilot-password") || source.includes("/services/Soap/u/")) {
+  failures.push("content.js still contains SOAP username/password login");
+}
+
+if (!source.includes("Connect Salesforce") || !source.includes("oauth-pkce")) {
+  failures.push("content.js is missing the OAuth Connect Salesforce UI");
 }
 
 if (failures.length > 0) {

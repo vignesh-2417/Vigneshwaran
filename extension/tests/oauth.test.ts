@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generatePKCE } from "../src/salesforce/pkce.js";
 import {
-  buildAuthorizationUrl,
+  buildSalesforceAuthorizationUrl,
   extractAuthorizationCode,
   exchangeAuthorizationCode
 } from "../src/salesforce/oauth.js";
@@ -18,10 +18,10 @@ describe("PKCE", () => {
 
 describe("Salesforce OAuth helpers", () => {
   it("builds an authorize URL with PKCE and no client secret", () => {
-    const url = buildAuthorizationUrl({
+    const url = buildSalesforceAuthorizationUrl({
       loginUrl: "https://login.salesforce.com",
       clientId: "abc",
-      redirectUri: "https://ext.chromiumapp.org/",
+      redirectUri: "https://ext.chromiumapp.org/oauth2",
       codeChallenge: "challenge",
       state: "state-1"
     });
@@ -34,7 +34,7 @@ describe("Salesforce OAuth helpers", () => {
   it("extracts the authorization code when state matches", () => {
     expect(
       extractAuthorizationCode(
-        "https://ext.chromiumapp.org/?code=AUTHCODE&state=state-1",
+        "https://ext.chromiumapp.org/oauth2?code=AUTHCODE&state=state-1",
         "state-1"
       )
     ).toBe("AUTHCODE");
@@ -43,7 +43,7 @@ describe("Salesforce OAuth helpers", () => {
   it("treats access_denied as cancellation", () => {
     expect(() =>
       extractAuthorizationCode(
-        "https://ext.chromiumapp.org/?error=access_denied&state=state-1",
+        "https://ext.chromiumapp.org/oauth2?error=access_denied&state=state-1",
         "state-1"
       )
     ).toThrow(/cancelled/i);
@@ -53,7 +53,7 @@ describe("Salesforce OAuth helpers", () => {
     const result = await exchangeAuthorizationCode({
       loginUrl: "https://login.salesforce.com",
       clientId: "abc",
-      redirectUri: "https://ext.chromiumapp.org/",
+      redirectUri: "https://ext.chromiumapp.org/oauth2",
       code: "AUTHCODE",
       codeVerifier: "verifier",
       fetchImpl: async (_url, init) => {

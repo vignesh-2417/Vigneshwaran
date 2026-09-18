@@ -35,6 +35,20 @@ export const COPILOT_CSS = `
   pointer-events: none;
 }
 
+.connect-float {
+  pointer-events: auto;
+}
+
+.build-stamp {
+  margin: 0;
+  font-size: 11px;
+  color: #706e6b;
+  letter-spacing: 0.04em;
+}
+
+.status-dot-off { background: #c9c9c9; }
+.not-connected { color: #706e6b; }
+
 button, textarea, select { font: inherit; }
 
 .sr-only {

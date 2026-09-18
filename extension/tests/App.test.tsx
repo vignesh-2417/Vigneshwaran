@@ -25,9 +25,8 @@ function renderApp(
 }
 
 async function connect(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
   await user.click(screen.getByRole("button", { name: "Connect Salesforce" }));
-  expect(await screen.findByText(/Connected/)).toBeInTheDocument();
+  expect(await screen.findByText(/Connected as|● Connected|Connected/)).toBeInTheDocument();
 }
 
 afterEach(() => {
@@ -38,26 +37,25 @@ describe("assistant panel", () => {
   it("opens and closes from the floating icon and close button", async () => {
     const user = userEvent.setup();
     renderApp();
-    const icon = screen.getByRole("button", { name: "Salesforce Metadata Copilot" });
-    await user.click(icon);
     expect(screen.getByRole("dialog", { name: "Salesforce Metadata Copilot" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close assistant" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
+    expect(screen.getByRole("dialog", { name: "Salesforce Metadata Copilot" })).toBeInTheDocument();
   });
 
   it("asks the user to connect with OAuth instead of a password", async () => {
-    const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
     expect(screen.getByRole("button", { name: "Connect Salesforce" })).toBeInTheDocument();
+    expect(screen.getByText(/does not ask for or store your password/i)).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Salesforce username")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/security token/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/login host/i)).not.toBeInTheDocument();
   });
 
   it("requires login before creating metadata", async () => {
-    const user = userEvent.setup();
     renderApp();
-    await user.click(screen.getByRole("button", { name: "Salesforce Metadata Copilot" }));
     expect(screen.queryByRole("button", { name: "Analyze" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect Salesforce" })).toBeInTheDocument();
   });

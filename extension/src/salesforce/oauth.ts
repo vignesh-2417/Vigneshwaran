@@ -17,7 +17,7 @@ export interface OAuthRuntime {
 
 function chromeRuntime(): OAuthRuntime {
   return {
-    getRedirectURL: () => chrome.identity.getRedirectURL(),
+    getRedirectURL: () => chrome.identity.getRedirectURL("oauth2"),
     launchWebAuthFlow: (details) =>
       new Promise((resolve, reject) => {
         chrome.identity.launchWebAuthFlow(details, (redirectUrl) => {
@@ -36,7 +36,7 @@ function chromeRuntime(): OAuthRuntime {
   };
 }
 
-export function buildAuthorizationUrl(input: {
+export function buildSalesforceAuthorizationUrl(input: {
   loginUrl: string;
   clientId: string;
   redirectUri: string;
@@ -135,7 +135,7 @@ export async function exchangeAuthorizationCode(input: {
   };
 }
 
-export async function getCurrentSalesforceUser(
+export async function getSalesforceUser(
   instanceUrl: string,
   accessToken: string,
   fetchImpl: typeof fetch = fetch
@@ -175,7 +175,7 @@ export async function authenticateWithSalesforce(
   const redirectUri = runtime.getRedirectURL();
   const pkce = await generatePKCE();
   const state = generateOAuthState();
-  const authorizeUrl = buildAuthorizationUrl({
+  const authorizeUrl = buildSalesforceAuthorizationUrl({
     loginUrl,
     clientId,
     redirectUri,
@@ -201,7 +201,7 @@ export async function authenticateWithSalesforce(
     codeVerifier: pkce.codeVerifier,
     fetchImpl: runtime.fetch
   });
-  const user = await getCurrentSalesforceUser(tokens.instanceUrl, tokens.accessToken, runtime.fetch);
+  const user = await getSalesforceUser(tokens.instanceUrl, tokens.accessToken, runtime.fetch);
   return {
     isAuthenticated: true,
     accessToken: tokens.accessToken,

@@ -1,5 +1,4 @@
 node_modules/
-dist/
 coverage/
 *.log
 .DS_Store
@@ -7,6 +6,5 @@ coverage/
 .env.*
 !.env.example
 backend/dist/
-extension/dist/
 shared/dist/
 *.tsbuildinfo

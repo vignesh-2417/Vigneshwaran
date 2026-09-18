@@ -137,7 +137,7 @@ export function AssistantPanel({
             {PRODUCT_NAME}
           </h1>
           <p className="connected-status">
-            <span className="status-dot" aria-hidden="true" /> Connected
+            <span className="status-dot" aria-hidden="true" /> Connected as {auth.username}
           </p>
         </div>
         <AccountMenu auth={auth} onDisconnect={onDisconnect} onOpenSalesforce={onOpenSalesforce} />

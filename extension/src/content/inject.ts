@@ -79,7 +79,8 @@ export async function injectAssistant(
   const host = doc.createElement("div");
   host.id = HOST_ELEMENT_ID;
   host.setAttribute("data-sf-metadata-copilot", "true");
-  host.setAttribute("data-sf-metadata-copilot-version", "v2");
+  host.setAttribute("data-sf-metadata-copilot-version", "v0.2.0");
+  host.setAttribute("data-sf-metadata-copilot-auth", "oauth-pkce");
   host.style.cssText =
     "all:initial;position:fixed;inset:0;pointer-events:none;z-index:2147483647;";
   (doc.body ?? doc.documentElement).appendChild(host);

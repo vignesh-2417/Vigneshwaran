@@ -24,7 +24,9 @@ describe("content script injection", () => {
       const button = host?.shadowRoot?.querySelector(
         "button[aria-label='Salesforce Metadata Copilot']"
       );
-      expect(button).not.toBeNull();
+      expect(host?.shadowRoot?.querySelector("[data-auth-mode='oauth-pkce']")).not.toBeNull();
+      expect(host?.shadowRoot?.textContent).toContain("Connect Salesforce");
+      expect(host?.shadowRoot?.textContent).not.toContain("Security token");
     });
   });
 

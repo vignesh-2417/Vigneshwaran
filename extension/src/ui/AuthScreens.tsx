@@ -17,33 +17,14 @@ export function AuthScreens({
 }: AuthScreensProps) {
   const connecting = status === "loading";
   return (
-    <div className="auth-screen">
-      <p className="eyebrow">Salesforce Metadata Copilot</p>
-      <h2>Build Salesforce metadata faster with AI.</h2>
-      <p className="auth-lead">
-        Connect your own Salesforce user. Passwords and security tokens are never requested or stored.
+    <div className="auth-screen" data-auth-mode="oauth-pkce">
+      <p className="eyebrow">✨ Salesforce Metadata Copilot</p>
+      <p className="build-stamp">OAuth PKCE · v0.2.0</p>
+      <h2>Build Salesforce metadata faster.</h2>
+      <p className="connected-status not-connected">
+        <span className="status-dot status-dot-off" aria-hidden="true" /> Not connected
       </p>
-      <fieldset className="env-fieldset" disabled={connecting}>
-        <legend>Environment</legend>
-        <label className="env-option">
-          <input
-            type="radio"
-            name="sfcopilot-environment"
-            checked={environment === "production"}
-            onChange={() => onEnvironmentChange("production")}
-          />
-          Production
-        </label>
-        <label className="env-option">
-          <input
-            type="radio"
-            name="sfcopilot-environment"
-            checked={environment === "sandbox"}
-            onChange={() => onEnvironmentChange("sandbox")}
-          />
-          Sandbox
-        </label>
-      </fieldset>
+      <p className="auth-lead">Connect your Salesforce account to continue.</p>
       {connecting ? (
         <div className="status status-loading" role="status">
           <span className="spinner" aria-hidden="true" />
@@ -64,9 +45,23 @@ export function AuthScreens({
         {connecting ? "Connecting…" : errorMessage ? "Try Again" : "Connect Salesforce"}
       </button>
       <p className="secure-note">
-        🔒 Secure Salesforce OAuth
-        <span>Your Salesforce password is never stored by this extension.</span>
+        🔒 Secure OAuth
+        <span>Your Salesforce password is handled by Salesforce.</span>
+        <span>The extension does not ask for or store your password.</span>
       </p>
+      <label htmlFor="sfcopilot-environment">Environment</label>
+      <select
+        id="sfcopilot-environment"
+        className="field-type-select"
+        value={environment}
+        disabled={connecting}
+        onChange={(event) =>
+          onEnvironmentChange(event.target.value as SalesforceEnvironment)
+        }
+      >
+        <option value="production">Production</option>
+        <option value="sandbox">Sandbox</option>
+      </select>
     </div>
   );
 }

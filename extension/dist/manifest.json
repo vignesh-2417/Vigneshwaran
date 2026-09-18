@@ -5,7 +5,7 @@
   "description": "Floating assistant for Salesforce metadata requirements on Lightning pages.",
   "minimum_chrome_version": "114",
   "background": {
-    "service_worker": "dist/background.js",
+    "service_worker": "background.js",
     "type": "module"
   },
   "content_scripts": [
@@ -19,12 +19,18 @@
         "https://login.salesforce.com/*",
         "https://test.salesforce.com/*"
       ],
-      "js": ["process-shim.js", "dist/content.js"],
+      "js": [
+        "process-shim.js",
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
-  "permissions": ["storage", "identity"],
+  "permissions": [
+    "storage",
+    "identity"
+  ],
   "host_permissions": [
     "http://127.0.0.1:8787/*",
     "http://localhost:8787/*",
